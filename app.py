@@ -427,7 +427,13 @@ TIME_OPTIONS = {
 }
 
 ENTRY_AMOUNT = 100
-client = Client()
+
+# Initialize Binance client with error handling
+try:
+    client = Client()
+except Exception as e:
+    print(f"Warning: Unable to connect to Binance API: {e}")
+    client = None
 
 # Helper function to format large numbers
 def format_large_number(num):
@@ -446,6 +452,9 @@ def format_large_number(num):
 # Cache functions
 @st.cache_data(ttl=300)
 def fetch_data(symbol, interval, limit):
+    if client is None:
+        st.error("⚠️ Binance API is not available. Please check your connection.")
+        return pd.DataFrame()
     try:
         klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
         df = pd.DataFrame(klines, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume',
@@ -504,6 +513,8 @@ def get_fng_color(value):
 @st.cache_data(ttl=60)
 def fetch_24h_ticker(symbol):
     """Fetch 24h ticker statistics from Binance"""
+    if client is None:
+        return None
     try:
         ticker = client.get_ticker(symbol=symbol)
         return {
@@ -525,6 +536,8 @@ def fetch_24h_ticker(symbol):
 @st.cache_data(ttl=10)
 def fetch_order_book(symbol, limit=20):
     """Fetch order book depth from Binance"""
+    if client is None:
+        return None
     try:
         depth = client.get_order_book(symbol=symbol, limit=limit)
         bids = [[float(price), float(qty)] for price, qty in depth['bids']]
@@ -536,6 +549,8 @@ def fetch_order_book(symbol, limit=20):
 @st.cache_data(ttl=10)
 def fetch_recent_trades(symbol, limit=20):
     """Fetch recent trades from Binance"""
+    if client is None:
+        return None
     try:
         trades = client.get_recent_trades(symbol=symbol, limit=limit)
         return [{
@@ -789,6 +804,8 @@ def fetch_market_dominance():
 @st.cache_data(ttl=600)
 def fetch_top_gainers_losers(limit=10):
     """Fetch top gainers and losers from Binance (only from our coin list)"""
+    if client is None:
+        return {'gainers': [], 'losers': []}
     try:
         # Get all USDT pairs 24h ticker
         tickers = client.get_ticker()
@@ -1460,6 +1477,10 @@ def backtest_fng(df, fng, symbol, interval):
     Backtest using Fear & Greed Index with daily precision.
     Always fetches daily data for accurate backtesting regardless of chart interval.
     """
+    if client is None:
+        st.error("⚠️ Binance API is not available. Cannot perform backtest.")
+        return None
+
     # Get the date range from the chart data
     start_date = df['timestamp'].min()
     end_date = df['timestamp'].max()
@@ -1584,6 +1605,10 @@ def analyze_seasonality(symbol, years=10):
 
         # Fallback to Binance if CoinGecko failed
         if df is None or df.empty:
+            if client is None:
+                st.error("⚠️ Unable to fetch historical data. Binance API is not available.")
+                return
+
             all_data = []
             chunks_needed = (total_days // 1000) + 1
             end_time = int(datetime.now().timestamp() * 1000)
@@ -1996,6 +2021,10 @@ with col_theme:
     if st.button(f"{theme_icon} {theme_label}", use_container_width=True, key="theme_toggle"):
         st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
         st.rerun()
+
+# Show warning if Binance API is not available
+if client is None:
+    st.warning("⚠️ **Limited Mode**: Unable to connect to Binance API. Some features may not work properly. Using CoinGecko as fallback where possible.")
 
 # Horizontal Navigation Menu - Modern Style
 st.markdown("<div style='margin: 20px 0;'></div>", unsafe_allow_html=True)
