@@ -538,8 +538,9 @@ def fetch_data_coingecko_fallback(symbol, limit):
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
         params = {
             'vs_currency': 'usd',
-            'days': days,
-            'interval': 'daily' if days > 90 else 'hourly'
+            'days': days
+            # Note: interval is auto-determined by CoinGecko based on 'days' value
+            # hourly: 2-90 days, daily: >90 days (hourly requires Enterprise plan if specified manually)
         }
 
         # Add API key to headers if available
