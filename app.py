@@ -9,6 +9,7 @@ from ta.momentum import RSIIndicator, StochasticOscillator
 from binance.client import Client
 import requests
 import numpy as np
+import time
 
 # Page config
 st.set_page_config(
@@ -479,7 +480,7 @@ def fetch_data(symbol, interval, limit):
         print(f"Binance error: {e}, trying CoinGecko fallback...")
         return fetch_data_coingecko_fallback(symbol, limit)
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)  # Cache for 10 minutes to reduce API calls
 def fetch_data_coingecko_fallback(symbol, limit):
     """Fallback to CoinGecko when Binance is unavailable"""
     # Map Binance symbols to CoinGecko IDs (comprehensive list)
@@ -530,11 +531,34 @@ def fetch_data_coingecko_fallback(symbol, limit):
             'interval': 'daily' if days > 90 else 'hourly'
         }
 
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
+        # Retry logic with exponential backoff
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(url, params=params, timeout=15)
+
+                if response.status_code == 429:  # Rate limit
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+                        continue
+                    else:
+                        st.warning("⚠️ CoinGecko rate limit reached. Using cached data if available.")
+                        return pd.DataFrame()
+
+                response.raise_for_status()
+                data = response.json()
+                break
+
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                else:
+                    st.error(f"⚠️ Network error: {str(e)}")
+                    return pd.DataFrame()
 
         if 'prices' not in data:
-            st.error("⚠️ Failed to fetch data from CoinGecko.")
+            st.error("⚠️ Invalid response from CoinGecko API.")
             return pd.DataFrame()
 
         # Convert to DataFrame
@@ -2115,9 +2139,9 @@ with col_theme:
 
 # Show info banner about data source
 if client is None:
-    st.info("📊 **Data Source**: Using CoinGecko API for market data. Some real-time features may have limited functionality. For full features, ensure Binance API is accessible in your region.")
+    st.info("📊 **Data Source**: Using CoinGecko API for market data. Some real-time features may have limited functionality. For full features, ensure Binance API is accessible in your region.", icon="ℹ️")
 else:
-    st.success("✅ **Connected**: Real-time data from Binance API")
+    st.success("✅ **Connected**: Real-time data from Binance API", icon="✅")
 
 # Horizontal Navigation Menu - Modern Style
 st.markdown("<div style='margin: 20px 0;'></div>", unsafe_allow_html=True)
