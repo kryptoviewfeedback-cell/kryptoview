@@ -11,6 +11,9 @@ import requests
 import numpy as np
 import time
 
+# Get CoinGecko API Key from Streamlit secrets
+COINGECKO_API_KEY = st.secrets.get("COINGECKO_API_KEY", None)
+
 # Page config
 st.set_page_config(
     page_title="KryptoView - Crypto Analytics Platform",
@@ -531,11 +534,16 @@ def fetch_data_coingecko_fallback(symbol, limit):
             'interval': 'daily' if days > 90 else 'hourly'
         }
 
+        # Add API key to headers if available
+        headers = {}
+        if COINGECKO_API_KEY:
+            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
+
         # Retry logic with exponential backoff
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = requests.get(url, params=params, timeout=15)
+                response = requests.get(url, params=params, headers=headers, timeout=15)
 
                 if response.status_code == 429:  # Rate limit
                     if attempt < max_retries - 1:
@@ -718,7 +726,13 @@ def fetch_coingecko_data(symbol):
 
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
-        r = requests.get(url, timeout=10)
+
+        # Add API key to headers if available
+        headers = {}
+        if COINGECKO_API_KEY:
+            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
+
+        r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
 
         market_data = data['market_data']
@@ -755,7 +769,13 @@ def fetch_global_crypto_data():
     """Fetch global crypto market data from CoinGecko"""
     try:
         url = "https://api.coingecko.com/api/v3/global"
-        r = requests.get(url, timeout=10)
+
+        # Add API key to headers if available
+        headers = {}
+        if COINGECKO_API_KEY:
+            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
+
+        r = requests.get(url, headers=headers, timeout=10)
         data = r.json()['data']
         return {
             'total_market_cap': data['total_market_cap']['usd'],
@@ -861,7 +881,12 @@ def fetch_top_coins(num_coins=50):
             'price_change_percentage': '1h,24h,7d'
         }
 
-        response = requests.get(url, params=params, timeout=15)
+        # Add API key to headers if available
+        headers = {}
+        if COINGECKO_API_KEY:
+            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
+
+        response = requests.get(url, params=params, headers=headers, timeout=15)
 
         if response.status_code == 200:
             data = response.json()
@@ -894,7 +919,13 @@ def fetch_market_dominance():
     """Fetch market cap dominance data from CoinGecko"""
     try:
         url = "https://api.coingecko.com/api/v3/global"
-        response = requests.get(url, timeout=10)
+
+        # Add API key to headers if available
+        headers = {}
+        if COINGECKO_API_KEY:
+            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
+
+        response = requests.get(url, headers=headers, timeout=10)
 
         if response.status_code == 200:
             data = response.json()
@@ -1658,7 +1689,12 @@ def fetch_coingecko_historical(coin_id, days):
             'interval': 'daily'
         }
 
-        response = requests.get(url, params=params, timeout=10)
+        # Add API key to headers if available
+        headers = {}
+        if COINGECKO_API_KEY:
+            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
+
+        response = requests.get(url, params=params, headers=headers, timeout=10)
 
         if response.status_code == 200:
             data = response.json()
@@ -2139,7 +2175,10 @@ with col_theme:
 
 # Show info banner about data source
 if client is None:
-    st.info("📊 **Data Source**: Using CoinGecko API for market data. Some real-time features may have limited functionality. For full features, ensure Binance API is accessible in your region.", icon="ℹ️")
+    if COINGECKO_API_KEY:
+        st.success("✅ **Data Source**: Using CoinGecko API with Demo API Key (10,000 calls/month, 30 calls/min)", icon="✅")
+    else:
+        st.info("📊 **Data Source**: Using CoinGecko API for market data. Some real-time features may have limited functionality. For full features, ensure Binance API is accessible in your region.", icon="ℹ️")
 else:
     st.success("✅ **Connected**: Real-time data from Binance API", icon="✅")
 
