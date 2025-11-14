@@ -12,7 +12,15 @@ import numpy as np
 import time
 
 # Get CoinGecko API Key from Streamlit secrets
-COINGECKO_API_KEY = st.secrets.get("COINGECKO_API_KEY", None)
+try:
+    COINGECKO_API_KEY = st.secrets.get("COINGECKO_API_KEY", None)
+    if COINGECKO_API_KEY:
+        print(f"✅ CoinGecko API Key loaded: {COINGECKO_API_KEY[:10]}...")
+    else:
+        print("⚠️ CoinGecko API Key not found in secrets")
+except Exception as e:
+    print(f"❌ Error loading API key: {e}")
+    COINGECKO_API_KEY = None
 
 # Page config
 st.set_page_config(
