@@ -1316,18 +1316,15 @@ def create_chart(df, symbol, ema1, ema2, show_ema=False, show_bb=False, show_rsi
         specs=specs
     )
 
-    # Candlestick chart (always visible)
-    fig.add_trace(go.Candlestick(
+    # Price line chart (cleaner than candlesticks)
+    fig.add_trace(go.Scatter(
         x=df['timestamp'],
-        open=df['Open'],
-        high=df['High'],
-        low=df['Low'],
-        close=df['Close'],
+        y=df['Close'],
         name='Price',
-        increasing_line_color='#26A69A',  # Green
-        decreasing_line_color='#EF5350',  # Red
-        increasing_fillcolor='#26A69A',
-        decreasing_fillcolor='#EF5350'
+        line=dict(color='#42A5F5', width=2),
+        fill='tozeroy',
+        fillcolor='rgba(66, 165, 245, 0.1)',
+        hovertemplate='<b>Price:</b> $%{y:,.2f}<br><b>Date:</b> %{x}<extra></extra>'
     ), row=1, col=1)
 
     # EMAs (toggleable)
@@ -1461,7 +1458,7 @@ def create_chart(df, symbol, ema1, ema2, show_ema=False, show_bb=False, show_rsi
         ), row=atr_row, col=1)
 
     fig.update_layout(
-        height=800,
+        height=500,  # Reduced from 800 to 500 for more compact view
         showlegend=True,
         hovermode='x unified',
         template='plotly_dark',
@@ -1694,8 +1691,8 @@ def fetch_coingecko_historical(coin_id, days):
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
         params = {
             'vs_currency': 'usd',
-            'days': days,
-            'interval': 'daily'
+            'days': days
+            # Note: interval is auto-determined by CoinGecko based on 'days' value
         }
 
         # Add API key to headers if available
@@ -1739,7 +1736,7 @@ def analyze_seasonality(symbol, years=10):
     """
     Analyze historical seasonality patterns for a cryptocurrency.
     Returns monthly, weekly, and daily statistics.
-    Combines CoinGecko (for maximum historical data) with Binance (fallback).
+    Uses CoinGecko API for historical data.
     """
     try:
         # Map Binance symbols to CoinGecko IDs
@@ -1754,60 +1751,19 @@ def analyze_seasonality(symbol, years=10):
         }
 
         coin_id = coin_map.get(symbol)
+        if not coin_id:
+            st.error(f"⚠️ Cryptocurrency {symbol} not supported for seasonality analysis.")
+            return None
+
         total_days = years * 365
 
-        df = None
+        with st.spinner(f'📥 Fetching {years} years of historical data from CoinGecko...'):
+            df = fetch_coingecko_historical(coin_id, total_days)
 
-        with st.spinner(f'📥 Fetching {years} years of historical data...'):
-            # Try CoinGecko first (has data from 2013 for Bitcoin)
-            if coin_id:
-                df = fetch_coingecko_historical(coin_id, total_days)
-
-        # Fallback to Binance if CoinGecko failed
+        # Check if data was fetched successfully
         if df is None or df.empty:
-            if client is None:
-                st.error("⚠️ Unable to fetch historical data. Binance API is not available.")
-                return
-
-            all_data = []
-            chunks_needed = (total_days // 1000) + 1
-            end_time = int(datetime.now().timestamp() * 1000)
-
-            with st.spinner(f'📥 Fetching {years} years from Binance...'):
-                for i in range(chunks_needed):
-                    try:
-                        klines = client.get_klines(
-                            symbol=symbol,
-                            interval=Client.KLINE_INTERVAL_1DAY,
-                            limit=1000,
-                            endTime=end_time
-                        )
-
-                        if not klines:
-                            break
-
-                        all_data.extend(klines)
-                        end_time = int(klines[0][0]) - 1
-
-                        if len(all_data) >= total_days:
-                            break
-
-                    except Exception as e:
-                        break
-
-            if not all_data:
-                return None
-
-            # Convert to DataFrame
-            df = pd.DataFrame(all_data, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume',
-                                               'Close_time', 'Quote_asset_volume', 'Number_of_trades',
-                                               'Taker_buy_base_volume', 'Taker_buy_quote_volume', 'Ignore'])
-            df['Open'] = df['Open'].astype(float)
-            df['Close'] = df['Close'].astype(float)
-            df['High'] = df['High'].astype(float)
-            df['Low'] = df['Low'].astype(float)
-            df['Volume'] = df['Volume'].astype(float)
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            st.error("⚠️ Unable to fetch historical data from CoinGecko. Please try again later.")
+            return None
 
         # Sort by timestamp (oldest first)
         df = df.sort_values('timestamp').reset_index(drop=True)
@@ -2286,7 +2242,7 @@ if mode == "📈 Chart Analysis":
         coingecko_data = fetch_coingecko_data(symbol)
         market_cap = coingecko_data['market_cap'] if coingecko_data else None
         circulating_supply = coingecko_data['circulating_supply'] if coingecko_data else None
-        oi_data = fetch_open_interest_coinglass(symbol)  # Use Coinglass API
+        volume_24h = coingecko_data['total_volume'] if coingecko_data else None  # Get 24h volume from CoinGecko
         fng_value, fng_class = fetch_current_fng()
 
         # Right sidebar with Key Metrics, F&G, and OI
@@ -2455,66 +2411,38 @@ if mode == "📈 Chart Analysis":
                 with col_greed:
                     st.markdown("<span style='font-size: 9px; color: #8b9dc3; text-align: right; display: block; font-weight: 600;'>🤑 Greed</span>", unsafe_allow_html=True)
 
-            # Open Interest Section (compact with Long/Short)
-            if oi_data:
+            # 24h Volume Section (replacing Open Interest)
+            if volume_24h:
                 st.markdown("""
                 <div style='background: linear-gradient(135deg, rgba(41, 98, 255, 0.12) 0%, rgba(30, 136, 229, 0.06) 100%);
                             padding: 8px; border-radius: 10px; border: 1px solid rgba(41, 98, 255, 0.25);
                             margin: 10px 0;'>
                     <p style='color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
                                margin: 0; text-transform: uppercase; text-align: center;'>
-                        🔓 OPEN INTEREST
+                        📊 24H VOLUME
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
 
-                source = oi_data.get('source', 'Unknown')
-                st.markdown(f"<p style='font-size: 10px; color: #b0b8c8; text-align: center; margin-bottom: 8px; font-weight: 500;'>Source: {source}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 10px; color: #b0b8c8; text-align: center; margin-bottom: 8px; font-weight: 500;'>Source: CoinGecko</p>", unsafe_allow_html=True)
 
-                # Total OI
+                # Total Volume
                 st.markdown(f"""
-                <div style='text-align: center; padding: 8px; background: linear-gradient(135deg, rgba(41, 98, 255, 0.08) 0%, rgba(30, 136, 229, 0.04) 100%);
+                <div style='text-align: center; padding: 12px; background: linear-gradient(135deg, rgba(41, 98, 255, 0.08) 0%, rgba(30, 136, 229, 0.04) 100%);
                             border-radius: 10px; margin-bottom: 8px;'>
-                    <div style='font-size: 10px; color: #b0b8c8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;'>TOTAL</div>
-                    <div style='font-size: 20px; font-weight: 800; color: #42A5F5; margin-top: 4px; letter-spacing: -0.5px;'>{format_large_number(oi_data['open_interest'])}</div>
+                    <div style='font-size: 10px; color: #b0b8c8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;'>TOTAL VOLUME</div>
+                    <div style='font-size: 24px; font-weight: 800; color: #42A5F5; margin-top: 4px; letter-spacing: -0.5px;'>{format_large_number(volume_24h)}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Long/Short positions
-                col_l, col_s = st.columns(2)
-                with col_l:
-                    st.markdown(f"""
-                    <div style='padding: 8px; background: linear-gradient(135deg, rgba(0, 200, 83, 0.15) 0%, rgba(0, 200, 83, 0.05) 100%);
-                                border-radius: 10px; border: 1px solid rgba(0, 200, 83, 0.3);'>
-                        <div style='font-size: 10px; color: #b0b8c8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;'>📈 LONG</div>
-                        <div style='font-size: 18px; font-weight: 800; color: #26E07F; margin: 4px 0; letter-spacing: -0.5px;'>{oi_data['long_percentage']:.1f}%</div>
-                        <div style='font-size: 10px; color: #26E07F; font-weight: 600;'>{format_large_number(oi_data.get('long_amount', 0))}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                with col_s:
-                    st.markdown(f"""
-                    <div style='padding: 8px; background: linear-gradient(135deg, rgba(255, 68, 68, 0.15) 0%, rgba(255, 68, 68, 0.05) 100%);
-                                border-radius: 10px; border: 1px solid rgba(255, 68, 68, 0.3);'>
-                        <div style='font-size: 10px; color: #b0b8c8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;'>📉 SHORT</div>
-                        <div style='font-size: 18px; font-weight: 800; color: #FF6B6B; margin: 4px 0; letter-spacing: -0.5px;'>{oi_data['short_percentage']:.1f}%</div>
-                        <div style='font-size: 10px; color: #FF6B6B; font-weight: 600;'>{format_large_number(oi_data.get('short_amount', 0))}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                # Progress bar
-                st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-                st.progress(oi_data['long_percentage'] / 100)
-
-                # 24h change
-                if 'oi_change_24h' in oi_data and oi_data['oi_change_24h'] is not None:
-                    change_color = "#26E07F" if oi_data['oi_change_24h'] >= 0 else "#FF6B6B"
-                    change_symbol = "+" if oi_data['oi_change_24h'] >= 0 else ""
+                # Volume/Market Cap Ratio
+                if market_cap and market_cap > 0:
+                    vol_mcap_ratio = (volume_24h / market_cap) * 100
                     st.markdown(f"""
                     <div style='text-align: center; padding: 8px; background: rgba(30, 40, 60, 0.4);
                                 border-radius: 10px; margin-top: 8px;'>
-                        <div style='font-size: 10px; color: #b0b8c8; font-weight: 600; letter-spacing: 0.5px;'>24H CHANGE</div>
-                        <div style='font-size: 15px; font-weight: 700; color: {change_color}; margin-top: 2px;'>{change_symbol}{oi_data['oi_change_24h']:.2f}%</div>
+                        <div style='font-size: 10px; color: #b0b8c8; font-weight: 600; letter-spacing: 0.5px;'>VOL/MCAP RATIO</div>
+                        <div style='font-size: 18px; font-weight: 700; color: #42A5F5; margin-top: 2px;'>{vol_mcap_ratio:.2f}%</div>
                     </div>
                     """, unsafe_allow_html=True)
 
