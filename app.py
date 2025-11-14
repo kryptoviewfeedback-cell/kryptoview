@@ -748,6 +748,7 @@ def fetch_coingecko_data(symbol):
 
         return {
             'market_cap': market_data['market_cap']['usd'],
+            'total_volume': market_data.get('total_volume', {}).get('usd', 0),  # 24h trading volume
             'ath': market_data['ath']['usd'],
             'ath_date': market_data['ath_date']['usd'],
             'ath_change_percentage': market_data['ath_change_percentage']['usd'],
@@ -2242,7 +2243,6 @@ if mode == "📈 Chart Analysis":
         coingecko_data = fetch_coingecko_data(symbol)
         market_cap = coingecko_data['market_cap'] if coingecko_data else None
         circulating_supply = coingecko_data['circulating_supply'] if coingecko_data else None
-        volume_24h = coingecko_data['total_volume'] if coingecko_data else None  # Get 24h volume from CoinGecko
         fng_value, fng_class = fetch_current_fng()
 
         # Right sidebar with Key Metrics, F&G, and OI
@@ -2411,40 +2411,7 @@ if mode == "📈 Chart Analysis":
                 with col_greed:
                     st.markdown("<span style='font-size: 9px; color: #8b9dc3; text-align: right; display: block; font-weight: 600;'>🤑 Greed</span>", unsafe_allow_html=True)
 
-            # 24h Volume Section (replacing Open Interest)
-            if volume_24h:
-                st.markdown("""
-                <div style='background: linear-gradient(135deg, rgba(41, 98, 255, 0.12) 0%, rgba(30, 136, 229, 0.06) 100%);
-                            padding: 8px; border-radius: 10px; border: 1px solid rgba(41, 98, 255, 0.25);
-                            margin: 10px 0;'>
-                    <p style='color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
-                               margin: 0; text-transform: uppercase; text-align: center;'>
-                        📊 24H VOLUME
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown(f"<p style='font-size: 10px; color: #b0b8c8; text-align: center; margin-bottom: 8px; font-weight: 500;'>Source: CoinGecko</p>", unsafe_allow_html=True)
-
-                # Total Volume
-                st.markdown(f"""
-                <div style='text-align: center; padding: 12px; background: linear-gradient(135deg, rgba(41, 98, 255, 0.08) 0%, rgba(30, 136, 229, 0.04) 100%);
-                            border-radius: 10px; margin-bottom: 8px;'>
-                    <div style='font-size: 10px; color: #b0b8c8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;'>TOTAL VOLUME</div>
-                    <div style='font-size: 24px; font-weight: 800; color: #42A5F5; margin-top: 4px; letter-spacing: -0.5px;'>{format_large_number(volume_24h)}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Volume/Market Cap Ratio
-                if market_cap and market_cap > 0:
-                    vol_mcap_ratio = (volume_24h / market_cap) * 100
-                    st.markdown(f"""
-                    <div style='text-align: center; padding: 8px; background: rgba(30, 40, 60, 0.4);
-                                border-radius: 10px; margin-top: 8px;'>
-                        <div style='font-size: 10px; color: #b0b8c8; font-weight: 600; letter-spacing: 0.5px;'>VOL/MCAP RATIO</div>
-                        <div style='font-size: 18px; font-weight: 700; color: #42A5F5; margin-top: 2px;'>{vol_mcap_ratio:.2f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            # Empty space (Open Interest section removed)
 
             # Main chart area (left side)
             with col_chart:
