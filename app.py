@@ -471,13 +471,49 @@ def format_large_number(num):
 # Cache functions
 @st.cache_data(ttl=300)
 def fetch_data(symbol, interval, limit):
-    """Fetch data from Binance with CoinGecko fallback"""
+    """Fetch data from Binance with CoinGecko fallback and chunked fetching for large limits"""
     if client is None:
         # Try CoinGecko as fallback
         return fetch_data_coingecko_fallback(symbol, limit)
 
     try:
-        klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        # Binance allows max 1000 candles per request
+        if limit <= 1000:
+            # Single request
+            klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        else:
+            # Multiple requests needed - fetch in chunks
+            all_klines = []
+            chunks_needed = (limit // 1000) + 1
+            end_time = int(datetime.now().timestamp() * 1000)
+
+            for i in range(chunks_needed):
+                try:
+                    chunk = client.get_klines(
+                        symbol=symbol,
+                        interval=interval,
+                        limit=min(1000, limit - len(all_klines)),
+                        endTime=end_time
+                    )
+
+                    if not chunk:
+                        break
+
+                    all_klines.extend(chunk)
+                    end_time = int(chunk[0][0]) - 1  # Get timestamp of first candle and go back
+
+                    if len(all_klines) >= limit:
+                        break
+
+                except Exception as e:
+                    print(f"Error fetching chunk {i}: {e}")
+                    break
+
+            klines = all_klines
+
+        if not klines:
+            return fetch_data_coingecko_fallback(symbol, limit)
+
         df = pd.DataFrame(klines, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume',
                                            'Close_time', 'Quote_asset_volume', 'Number_of_trades',
                                            'Taker_buy_base_volume', 'Taker_buy_quote_volume', 'Ignore'])
@@ -486,6 +522,10 @@ def fetch_data(symbol, interval, limit):
         df['Low'] = df['Low'].astype(float)
         df['Volume'] = df['Volume'].astype(float)
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+
+        # Sort by timestamp (chunks are fetched backwards)
+        df = df.sort_values('timestamp').reset_index(drop=True)
+
         return df
     except Exception as e:
         print(f"Binance error: {e}, trying CoinGecko fallback...")
