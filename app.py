@@ -429,10 +429,17 @@ TIME_OPTIONS = {
 ENTRY_AMOUNT = 100
 
 # Initialize Binance client with error handling
+BINANCE_AVAILABLE = False
 try:
-    client = Client()
+    # Try to initialize without API keys (public endpoints only)
+    client = Client("", "", {"timeout": 20})
+    # Test connection with a simple request
+    client.ping()
+    BINANCE_AVAILABLE = True
+    print("✅ Binance API connected successfully")
 except Exception as e:
-    print(f"Warning: Unable to connect to Binance API: {e}")
+    print(f"⚠️ Warning: Unable to connect to Binance API: {e}")
+    print("📊 Using CoinGecko as primary data source")
     client = None
 
 # Helper function to format large numbers
@@ -452,9 +459,11 @@ def format_large_number(num):
 # Cache functions
 @st.cache_data(ttl=300)
 def fetch_data(symbol, interval, limit):
+    """Fetch data from Binance with CoinGecko fallback"""
     if client is None:
-        st.error("⚠️ Binance API is not available. Please check your connection.")
-        return pd.DataFrame()
+        # Try CoinGecko as fallback
+        return fetch_data_coingecko_fallback(symbol, limit)
+
     try:
         klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
         df = pd.DataFrame(klines, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume',
@@ -467,7 +476,89 @@ def fetch_data(symbol, interval, limit):
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         return df
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        print(f"Binance error: {e}, trying CoinGecko fallback...")
+        return fetch_data_coingecko_fallback(symbol, limit)
+
+@st.cache_data(ttl=300)
+def fetch_data_coingecko_fallback(symbol, limit):
+    """Fallback to CoinGecko when Binance is unavailable"""
+    # Map Binance symbols to CoinGecko IDs (comprehensive list)
+    coin_map = {
+        'BTCUSDT': 'bitcoin', 'ETHUSDT': 'ethereum', 'BNBUSDT': 'binancecoin',
+        'SOLUSDT': 'solana', 'XRPUSDT': 'ripple', 'ADAUSDT': 'cardano',
+        'AVAXUSDT': 'avalanche-2', 'DOGEUSDT': 'dogecoin', 'TRXUSDT': 'tron',
+        'DOTUSDT': 'polkadot', 'MATICUSDT': 'matic-network', 'LINKUSDT': 'chainlink',
+        'TONUSDT': 'the-open-network', 'SHIBUSDT': 'shiba-inu', 'LTCUSDT': 'litecoin',
+        'BCHUSDT': 'bitcoin-cash', 'UNIUSDT': 'uniswap', 'XLMUSDT': 'stellar',
+        'ATOMUSDT': 'cosmos', 'ETCUSDT': 'ethereum-classic', 'HBARUSDT': 'hedera-hashgraph',
+        'FILUSDT': 'filecoin', 'ARBUSDT': 'arbitrum', 'OPUSDT': 'optimism',
+        'VETUSDT': 'vechain', 'ALGOUSDT': 'algorand', 'NEARUSDT': 'near',
+        'APTUSDT': 'aptos', 'INJUSDT': 'injective-protocol', 'SUIUSDT': 'sui',
+        'RNDRUSDT': 'render-token', 'FTMUSDT': 'fantom', 'THETAUSDT': 'theta-token',
+        'XMRUSDT': 'monero', 'KASUSDT': 'kaspa', 'STXUSDT': 'blockstack',
+        'IMXUSDT': 'immutable-x', 'CROUSDT': 'crypto-com-chain', 'MNTUSDT': 'mantle',
+        'GRTUSDT': 'the-graph', 'QNTUSDT': 'quant-network', 'LDOUSDT': 'lido-dao',
+        'MKRUSDT': 'maker', 'AAVEUSDT': 'aave', 'ARUSDT': 'arweave',
+        'TIAUSDT': 'celestia', 'SEIUSDT': 'sei-network', 'RUNEUSDT': 'thorchain',
+        'AXSUSDT': 'axie-infinity', 'SANDUSDT': 'the-sandbox', 'MANAUSDT': 'decentraland',
+        'GALAUSDT': 'gala', 'ENJUSDT': 'enjincoin', 'FLOWUSDT': 'flow',
+        'CHZUSDT': 'chiliz', 'FLRUSDT': 'flare-networks', 'KAVAUSDT': 'kava',
+        'SNXUSDT': 'synthetix-network-token', 'CRVUSDT': 'curve-dao-token',
+        'COMPUSDT': 'compound-governance-token', 'SUSHIUSDT': 'sushi',
+        '1INCHUSDT': '1inch', 'ZILUSDT': 'zilliqa', 'ZECUSDT': 'zcash',
+        'DASHUSDT': 'dash', 'QTUMUSDT': 'qtum', 'RVNUSDT': 'ravencoin',
+        'ONEUSDT': 'harmony', 'CELOUSDT': 'celo', 'ANKRUSDT': 'ankr',
+        'IOTAUSDT': 'iota', 'WAVESUSDT': 'waves', 'HOTUSDT': 'holotoken',
+        'RENUSDT': 'republic-protocol', 'OMGUSDT': 'omisego', 'LRCUSDT': 'loopring',
+        'FETUSDT': 'fetch-ai', 'OCEANUSDT': 'ocean-protocol', 'NMRUSDT': 'numeraire',
+        'BANDUSDT': 'band-protocol'
+    }
+
+    coin_id = coin_map.get(symbol)
+    if not coin_id:
+        st.error(f"⚠️ Symbol {symbol} not supported in fallback mode.")
+        return pd.DataFrame()
+
+    try:
+        # Calculate days based on limit (approximate)
+        days = min(max(limit // 24, 1), 365)  # CoinGecko free tier limit
+
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+        params = {
+            'vs_currency': 'usd',
+            'days': days,
+            'interval': 'daily' if days > 90 else 'hourly'
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+
+        if 'prices' not in data:
+            st.error("⚠️ Failed to fetch data from CoinGecko.")
+            return pd.DataFrame()
+
+        # Convert to DataFrame
+        prices = data['prices']
+        volumes = data.get('total_volumes', [])
+
+        df = pd.DataFrame({
+            'timestamp': [pd.to_datetime(p[0], unit='ms') for p in prices],
+            'Close': [p[1] for p in prices],
+            'Volume': [v[1] if len(volumes) > i else 0 for i, v in enumerate(volumes)]
+        })
+
+        # Approximate OHLC from close prices (not ideal but works)
+        df['Open'] = df['Close'].shift(1).fillna(df['Close'])
+        df['High'] = df['Close'] * 1.01  # Approximate
+        df['Low'] = df['Close'] * 0.99   # Approximate
+
+        # Limit to requested number of rows
+        df = df.tail(limit)
+
+        return df
+
+    except Exception as e:
+        st.error(f"⚠️ CoinGecko fallback failed: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -2022,9 +2113,11 @@ with col_theme:
         st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
         st.rerun()
 
-# Show warning if Binance API is not available
+# Show info banner about data source
 if client is None:
-    st.warning("⚠️ **Limited Mode**: Unable to connect to Binance API. Some features may not work properly. Using CoinGecko as fallback where possible.")
+    st.info("📊 **Data Source**: Using CoinGecko API for market data. Some real-time features may have limited functionality. For full features, ensure Binance API is accessible in your region.")
+else:
+    st.success("✅ **Connected**: Real-time data from Binance API")
 
 # Horizontal Navigation Menu - Modern Style
 st.markdown("<div style='margin: 20px 0;'></div>", unsafe_allow_html=True)
