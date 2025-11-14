@@ -482,27 +482,35 @@ def fetch_data(symbol, interval, limit):
             # Single request
             klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
         else:
-            # Multiple requests needed - fetch in chunks
+            # Multiple requests needed - fetch in chunks backwards from now
             all_klines = []
             chunks_needed = (limit // 1000) + 1
+            remaining = limit
+
+            # Start from current time and go backwards
             end_time = int(datetime.now().timestamp() * 1000)
 
             for i in range(chunks_needed):
                 try:
+                    chunk_size = min(1000, remaining)
                     chunk = client.get_klines(
                         symbol=symbol,
                         interval=interval,
-                        limit=min(1000, limit - len(all_klines)),
+                        limit=chunk_size,
                         endTime=end_time
                     )
 
                     if not chunk:
                         break
 
-                    all_klines.extend(chunk)
-                    end_time = int(chunk[0][0]) - 1  # Get timestamp of first candle and go back
+                    # Add chunk to beginning (we're going backwards)
+                    all_klines = chunk + all_klines
+                    remaining -= len(chunk)
 
-                    if len(all_klines) >= limit:
+                    # Move end_time to before the first candle of this chunk
+                    end_time = int(chunk[0][0]) - 1
+
+                    if remaining <= 0:
                         break
 
                 except Exception as e:
@@ -510,6 +518,10 @@ def fetch_data(symbol, interval, limit):
                     break
 
             klines = all_klines
+
+            # Trim to exact limit if we got more
+            if len(klines) > limit:
+                klines = klines[-limit:]
 
         if not klines:
             return fetch_data_coingecko_fallback(symbol, limit)
@@ -523,9 +535,6 @@ def fetch_data(symbol, interval, limit):
         df['Volume'] = df['Volume'].astype(float)
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
 
-        # Sort by timestamp (chunks are fetched backwards)
-        df = df.sort_values('timestamp').reset_index(drop=True)
-
         return df
     except Exception as e:
         print(f"Binance error: {e}, trying CoinGecko fallback...")
@@ -534,21 +543,21 @@ def fetch_data(symbol, interval, limit):
 @st.cache_data(ttl=600)
 def fetch_data_smart(symbol, timeframe_key):
     """
-    Smart data fetching based on timeframe:
-    - ≤365 days: Use CoinGecko (better data quality)
-    - >365 days: Use Binance with optimized intervals
+    Smart data fetching based on timeframe with accurate date ranges:
+    - Uses Binance for all timeframes for consistency and accuracy
+    - Calculates exact number of candles needed based on interval
     """
     # Map timeframe to days and optimal settings
     timeframe_config = {
-        '1D': {'days': 1, 'interval': Client.KLINE_INTERVAL_15MINUTE, 'limit': 96, 'use_coingecko': True},
-        '7D': {'days': 7, 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'use_coingecko': True},
-        '30D': {'days': 30, 'interval': Client.KLINE_INTERVAL_2HOUR, 'limit': 360, 'use_coingecko': True},
-        '3M': {'days': 90, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 540, 'use_coingecko': True},
-        '6M': {'days': 180, 'interval': Client.KLINE_INTERVAL_6HOUR, 'limit': 720, 'use_coingecko': True},
-        '1Y': {'days': 365, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'use_coingecko': True},
-        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 156, 'use_coingecko': False},  # Weekly candles (3 years ≈ 156 weeks)
-        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 260, 'use_coingecko': False},  # Weekly candles (5 years ≈ 260 weeks)
-        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520, 'use_coingecko': False}  # Weekly candles (10 years ≈ 520 weeks)
+        '1D': {'days': 1, 'interval': Client.KLINE_INTERVAL_15MINUTE, 'limit': 96},      # 24h * 4 = 96 candles
+        '7D': {'days': 7, 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168},        # 7d * 24h = 168 candles
+        '30D': {'days': 30, 'interval': Client.KLINE_INTERVAL_2HOUR, 'limit': 360},      # 30d * 12 = 360 candles
+        '3M': {'days': 90, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 540},       # 90d * 6 = 540 candles
+        '6M': {'days': 180, 'interval': Client.KLINE_INTERVAL_6HOUR, 'limit': 720},      # 180d * 4 = 720 candles
+        '1Y': {'days': 365, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365},       # 365 daily candles
+        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1095},     # 3 years daily (will use chunking)
+        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1825},     # 5 years daily (will use chunking)
+        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520}     # 10 years weekly
     }
 
     config = timeframe_config.get(timeframe_key)
@@ -556,12 +565,8 @@ def fetch_data_smart(symbol, timeframe_key):
         # Default fallback
         return fetch_data(symbol, Client.KLINE_INTERVAL_1DAY, limit=365)
 
-    # Use CoinGecko for ≤365 days
-    if config['use_coingecko']:
-        return fetch_data_coingecko_fallback(symbol, config['limit'], days=config['days'])
-    else:
-        # Use Binance for >365 days with optimized intervals
-        return fetch_data(symbol, config['interval'], limit=config['limit'])
+    # Use Binance for all timeframes (more accurate)
+    return fetch_data(symbol, config['interval'], limit=config['limit'])
 
 @st.cache_data(ttl=600)  # Cache for 10 minutes to reduce API calls
 def fetch_data_coingecko_fallback(symbol, limit, days=None):
