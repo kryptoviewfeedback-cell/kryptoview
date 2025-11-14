@@ -531,8 +531,40 @@ def fetch_data(symbol, interval, limit):
         print(f"Binance error: {e}, trying CoinGecko fallback...")
         return fetch_data_coingecko_fallback(symbol, limit)
 
+@st.cache_data(ttl=600)
+def fetch_data_smart(symbol, timeframe_key):
+    """
+    Smart data fetching based on timeframe:
+    - ≤365 days: Use CoinGecko (better data quality)
+    - >365 days: Use Binance with optimized intervals
+    """
+    # Map timeframe to days and optimal settings
+    timeframe_config = {
+        '1D': {'days': 1, 'interval': Client.KLINE_INTERVAL_15MINUTE, 'limit': 96, 'use_coingecko': True},
+        '7D': {'days': 7, 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'use_coingecko': True},
+        '30D': {'days': 30, 'interval': Client.KLINE_INTERVAL_2HOUR, 'limit': 360, 'use_coingecko': True},
+        '3M': {'days': 90, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 540, 'use_coingecko': True},
+        '6M': {'days': 180, 'interval': Client.KLINE_INTERVAL_6HOUR, 'limit': 720, 'use_coingecko': True},
+        '1Y': {'days': 365, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'use_coingecko': True},
+        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_3DAY, 'limit': 365, 'use_coingecko': False},  # 3-day candles
+        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 260, 'use_coingecko': False},  # Weekly candles
+        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520, 'use_coingecko': False}  # Weekly candles
+    }
+
+    config = timeframe_config.get(timeframe_key)
+    if not config:
+        # Default fallback
+        return fetch_data(symbol, Client.KLINE_INTERVAL_1DAY, limit=365)
+
+    # Use CoinGecko for ≤365 days
+    if config['use_coingecko']:
+        return fetch_data_coingecko_fallback(symbol, config['limit'], days=config['days'])
+    else:
+        # Use Binance for >365 days with optimized intervals
+        return fetch_data(symbol, config['interval'], limit=config['limit'])
+
 @st.cache_data(ttl=600)  # Cache for 10 minutes to reduce API calls
-def fetch_data_coingecko_fallback(symbol, limit):
+def fetch_data_coingecko_fallback(symbol, limit, days=None):
     """Fallback to CoinGecko when Binance is unavailable"""
     # Map Binance symbols to CoinGecko IDs (comprehensive list)
     coin_map = {
@@ -572,8 +604,11 @@ def fetch_data_coingecko_fallback(symbol, limit):
         return pd.DataFrame()
 
     try:
-        # Calculate days based on limit (approximate)
-        days = min(max(limit // 24, 1), 365)  # CoinGecko free tier limit
+        # Use provided days or calculate from limit
+        if days is None:
+            days = min(max(limit // 24, 1), 365)  # CoinGecko free tier limit
+        else:
+            days = min(days, 365)  # Ensure we don't exceed CoinGecko limit
 
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
         params = {
@@ -2576,40 +2611,12 @@ if mode == "📈 Chart Analysis":
                     </div>
                     """, unsafe_allow_html=True)
 
-                # Map timeframe to interval and number of candles
-                timeframe_options = {
-                    '1D': '15m',
-                    '7D': '1h',
-                    '30D': '2h',
-                    '3M': '4h',
-                    '6M': '6h',
-                    '1Y': '1d',
-                    '3Y': '1d',
-                    '5Y': '1w',
-                    'All': '1w'
-                }
-
-                # Map timeframe to number of candles needed
-                timeframe_limits = {
-                    '1D': 96,
-                    '7D': 168,
-                    '30D': 360,
-                    '3M': 540,
-                    '6M': 720,
-                    '1Y': 500,
-                    '3Y': 1000,
-                    '5Y': 500,
-                    'All': 1000
-                }
-
-                # Fetch data based on selected timeframe
+                # Fetch data based on selected timeframe using smart fetching
                 chart_tf = st.session_state['chart_timeframe']
-                chart_interval = timeframe_options[chart_tf]
-                chart_limit = timeframe_limits[chart_tf]
 
-                # Fetch chart data
+                # Fetch chart data using smart function
                 with st.spinner(f'Loading {chart_tf} data...'):
-                    df_chart = fetch_data(symbol, chart_interval, limit=min(chart_limit, 1000))
+                    df_chart = fetch_data_smart(symbol, chart_tf)
 
                 if not df_chart.empty:
                     # Calculate indicators for chart data
