@@ -1323,8 +1323,6 @@ def create_chart(df, symbol, ema1, ema2, show_ema=False, show_bb=False, show_rsi
         y=df['Close'],
         name='Price',
         line=dict(color='#42A5F5', width=2),
-        fill='tozeroy',
-        fillcolor='rgba(66, 165, 245, 0.1)',
         hovertemplate='<b>Price:</b> $%{y:,.2f}<br><b>Date:</b> %{x}<extra></extra>'
     ), row=1, col=1)
 
@@ -1474,24 +1472,26 @@ def create_chart(df, symbol, ema1, ema2, show_ema=False, show_bb=False, show_rsi
     fig.update_xaxes(fixedrange=False)
     fig.update_yaxes(fixedrange=False)
 
-    # Update y-axes for price chart (move to right side)
+    # Update y-axes for price chart (move to right side, auto-range for better visibility)
     fig.update_yaxes(
         title_text="Price (USDT)",
         side='right',
+        autorange=True,
+        fixedrange=False,
         row=1, col=1
     )
 
-    # Update y-axes for RSI if shown
+    # Update y-axes for RSI if shown (auto-range for better visibility)
     if show_rsi and rsi_row:
-        fig.update_yaxes(title_text="RSI", side='right', row=rsi_row, col=1)
+        fig.update_yaxes(title_text="RSI", side='right', autorange=True, fixedrange=False, row=rsi_row, col=1)
 
-    # Update y-axes for Volume if shown
+    # Update y-axes for Volume if shown (auto-range for better visibility)
     if show_volume and volume_row:
-        fig.update_yaxes(title_text="Volume", side='right', row=volume_row, col=1)
+        fig.update_yaxes(title_text="Volume", side='right', autorange=True, fixedrange=False, row=volume_row, col=1)
 
-    # Update y-axes for MACD if shown
+    # Update y-axes for MACD if shown (auto-range for better visibility)
     if show_macd and macd_row:
-        fig.update_yaxes(title_text="MACD", side='right', row=macd_row, col=1)
+        fig.update_yaxes(title_text="MACD", side='right', autorange=True, fixedrange=False, row=macd_row, col=1)
 
     # Update y-axes for Stochastic if shown
     if show_stoch and stoch_row:
