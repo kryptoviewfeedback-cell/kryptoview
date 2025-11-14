@@ -546,9 +546,9 @@ def fetch_data_smart(symbol, timeframe_key):
         '3M': {'days': 90, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 540, 'use_coingecko': True},
         '6M': {'days': 180, 'interval': Client.KLINE_INTERVAL_6HOUR, 'limit': 720, 'use_coingecko': True},
         '1Y': {'days': 365, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'use_coingecko': True},
-        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_3DAY, 'limit': 365, 'use_coingecko': False},  # 3-day candles
-        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 260, 'use_coingecko': False},  # Weekly candles
-        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520, 'use_coingecko': False}  # Weekly candles
+        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 156, 'use_coingecko': False},  # Weekly candles (3 years ≈ 156 weeks)
+        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 260, 'use_coingecko': False},  # Weekly candles (5 years ≈ 260 weeks)
+        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520, 'use_coingecko': False}  # Weekly candles (10 years ≈ 520 weeks)
     }
 
     config = timeframe_config.get(timeframe_key)
