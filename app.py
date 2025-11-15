@@ -501,11 +501,24 @@ TIME_OPTIONS = {
 
 ENTRY_AMOUNT = 100
 
+# Get Binance API credentials from Streamlit secrets
+try:
+    BINANCE_API_KEY = st.secrets.get("BINANCE_API_KEY", "")
+    BINANCE_API_SECRET = st.secrets.get("BINANCE_API_SECRET", "")
+    if BINANCE_API_KEY and BINANCE_API_SECRET:
+        print(f"✅ Binance API credentials loaded from secrets")
+    else:
+        print("⚠️ Binance API credentials not found in secrets, using public API")
+except Exception as e:
+    print(f"❌ Error loading Binance API credentials: {e}")
+    BINANCE_API_KEY = ""
+    BINANCE_API_SECRET = ""
+
 # Initialize Binance client with error handling
 BINANCE_AVAILABLE = False
 try:
-    # Try to initialize without API keys (public endpoints only)
-    client = Client("", "", {"timeout": 20})
+    # Initialize with API keys from secrets (or empty for public endpoints)
+    client = Client(BINANCE_API_KEY, BINANCE_API_SECRET, {"timeout": 20})
     # Test connection with a simple request
     client.ping()
     BINANCE_AVAILABLE = True
