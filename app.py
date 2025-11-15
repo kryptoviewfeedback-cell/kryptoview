@@ -516,15 +516,21 @@ except Exception as e:
 
 # Initialize Binance client with error handling
 BINANCE_AVAILABLE = False
+client = None
 try:
     # Initialize with API keys from secrets (or empty for public endpoints)
     client = Client(BINANCE_API_KEY, BINANCE_API_SECRET, {"timeout": 20})
-    # Test connection with a simple request
-    client.ping()
+    # Test connection with a simple request (but don't fail if ping fails)
+    try:
+        client.ping()
+        print("✅ Binance API ping successful")
+    except:
+        print("⚠️ Binance ping failed, but client may still work for data fetching")
+
     BINANCE_AVAILABLE = True
-    print("✅ Binance API connected successfully")
+    print("✅ Binance API client initialized")
 except Exception as e:
-    print(f"⚠️ Warning: Unable to connect to Binance API: {e}")
+    print(f"⚠️ Warning: Unable to initialize Binance client: {e}")
     print("📊 Using CoinGecko as primary data source")
     client = None
 
@@ -1861,7 +1867,10 @@ def fetch_binance_historical(symbol, days):
     """Fetch historical data from Binance API for seasonality analysis"""
     try:
         if client is None:
+            print("❌ fetch_binance_historical: client is None")
             return None
+
+        print(f"📊 Fetching {days} days of {symbol} data from Binance...")
 
         # Use daily candles for historical data
         interval = Client.KLINE_INTERVAL_1DAY
@@ -1940,7 +1949,8 @@ def analyze_seasonality(symbol, years=10):
     try:
         # Check if Binance client is available
         if client is None:
-            st.error("⚠️ Binance API not available. Cannot fetch historical data.")
+            st.error("⚠️ Binance API client is not initialized. Please check API credentials in Streamlit secrets.")
+            st.info("💡 Make sure BINANCE_API_KEY and BINANCE_API_SECRET are set in Settings → Secrets")
             return None
 
         total_days = years * 365
@@ -1950,7 +1960,8 @@ def analyze_seasonality(symbol, years=10):
 
         # Check if data was fetched successfully
         if df is None or df.empty:
-            st.error("⚠️ Unable to fetch historical data from Binance. Please try again later.")
+            st.error("⚠️ Unable to fetch historical data from Binance. The API request failed.")
+            st.info("💡 This could be due to network issues or API rate limiting. Try again in a few moments.")
             return None
 
         # Sort by timestamp (oldest first)
