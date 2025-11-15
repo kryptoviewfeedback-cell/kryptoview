@@ -416,30 +416,35 @@ CHART_INTERVALS = {
         'interval': Client.KLINE_INTERVAL_5MINUTE,
         'limit': 288,  # Last 24 hours (1 day)
         'ema_type': 'short',
+        'range': 'Last 24 hours',
     },
     '1h': {
         'name': '1 Hour',
         'interval': Client.KLINE_INTERVAL_1HOUR,
         'limit': 168,  # Last 7 days (1 week)
         'ema_type': 'mid',
+        'range': 'Last 7 days',
     },
     '4h': {
         'name': '4 Hours',
         'interval': Client.KLINE_INTERVAL_4HOUR,
         'limit': 180,  # Last 30 days (1 month)
         'ema_type': 'mid',
+        'range': 'Last 30 days',
     },
     '1d': {
         'name': '1 Day',
         'interval': Client.KLINE_INTERVAL_1DAY,
         'limit': 365,  # Last 12 months (1 year)
         'ema_type': 'long',
+        'range': 'Last 1 year',
     },
     '1w': {
         'name': '1 Week',
         'interval': Client.KLINE_INTERVAL_1WEEK,
         'limit': 104,  # Last 24 months (2 years)
         'ema_type': 'long',
+        'range': 'Last 2 years',
     },
 }
 
@@ -491,17 +496,18 @@ except Exception as e:
 BINANCE_AVAILABLE = False
 client = None
 try:
-    # Initialize with API keys from secrets (or empty for public endpoints)
-    client = Client(BINANCE_API_KEY, BINANCE_API_SECRET, {"timeout": 20})
+    # Initialize with FREE API (no authentication needed for public endpoints)
+    # Using empty strings for API keys to use Binance's free public data
+    client = Client("", "", {"timeout": 20})
     # Test connection with a simple request (but don't fail if ping fails)
     try:
         client.ping()
-        print("✅ Binance API ping successful")
+        print("✅ Binance FREE API ping successful")
     except:
         print("⚠️ Binance ping failed, but client may still work for data fetching")
 
     BINANCE_AVAILABLE = True
-    print("✅ Binance API client initialized")
+    print("✅ Binance FREE API client initialized")
 except Exception as e:
     print(f"⚠️ Warning: Unable to initialize Binance client: {e}")
     print("📊 Using CoinGecko as primary data source")
@@ -522,7 +528,7 @@ def format_large_number(num):
         return f"${num:.2f}"
 
 # Cache functions
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)  # Changed from 300 to 60 for faster refresh
 def fetch_data(symbol, interval, limit):
     """Fetch data from Binance with CoinGecko fallback and chunked fetching for large limits"""
     if client is None:
@@ -534,6 +540,7 @@ def fetch_data(symbol, interval, limit):
         if limit <= 1000:
             # Single request
             klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+            print(f"📊 Fetched {len(klines)} candles for {symbol} ({interval}, limit={limit})")
         else:
             # Multiple requests needed - fetch in chunks backwards from now
             all_klines = []
@@ -576,6 +583,8 @@ def fetch_data(symbol, interval, limit):
             if len(klines) > limit:
                 klines = klines[-limit:]
 
+            print(f"📊 Fetched {len(klines)} candles for {symbol} ({interval}, limit={limit}) in {chunks_needed} chunks")
+
         if not klines:
             return fetch_data_coingecko_fallback(symbol, limit)
 
@@ -593,7 +602,7 @@ def fetch_data(symbol, interval, limit):
         print(f"Binance error: {e}, trying CoinGecko fallback...")
         return fetch_data_coingecko_fallback(symbol, limit)
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)  # Changed from 600 to 60 for faster refresh
 def fetch_data_smart(symbol, timeframe_key):
     """
     Smart data fetching based on timeframe with accurate date ranges:
@@ -2794,10 +2803,10 @@ if mode == "📈 Chart Analysis":
 
                         # Fetch data for all 4 timeframes (optimized for specific time ranges)
                         timeframes_multi = {
-                            '1h': {'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'title': '1 Hour'},      # Last 7 days
-                            '4h': {'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'title': '4 Hours'},     # Last 30 days
-                            '1d': {'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'title': '1 Day'},        # Last 1 year
-                            '1w': {'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 104, 'title': '1 Week'}       # Last 2 years
+                            '1h': {'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'title': '1 Hour', 'range': 'Last 7 days'},
+                            '4h': {'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'title': '4 Hours', 'range': 'Last 30 days'},
+                            '1d': {'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'title': '1 Day', 'range': 'Last 1 year'},
+                            '1w': {'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 104, 'title': '1 Week', 'range': 'Last 2 years'}
                         }
 
                         # Create 2x2 grid
@@ -2825,10 +2834,15 @@ if mode == "📈 Chart Analysis":
 
                                     df_multi, ema1_multi, ema2_multi = calculate_indicators(df_multi, ema_type_multi, timeframe=tf_key)
 
+                                    # Calculate actual date range from data
+                                    actual_start = df_multi['timestamp'].min().strftime('%Y-%m-%d')
+                                    actual_end = df_multi['timestamp'].max().strftime('%Y-%m-%d')
+                                    actual_candles = len(df_multi)
+
                                     # Create smaller chart (no indicators for cleaner view)
                                     fig_multi = create_chart(
                                         df_multi,
-                                        f"{crypto_name} - {tf_config['title']}",
+                                        f"{crypto_name} ({symbol}) - {tf_config['title']} - {tf_config['range']} ({actual_candles} candles)",
                                         ema1_multi,
                                         ema2_multi,
                                         show_ema=show_ema,
@@ -2841,8 +2855,19 @@ if mode == "📈 Chart Analysis":
                                         chart_type=chart_type
                                     )
 
-                                    # Update layout for smaller charts
-                                    fig_multi.update_layout(height=350, margin=dict(t=40, b=20, l=40, r=20))
+                                    # Update layout for smaller charts with date range info
+                                    fig_multi.update_layout(
+                                        height=350,
+                                        margin=dict(t=60, b=20, l=40, r=20),
+                                        annotations=[
+                                            dict(
+                                                text=f"📅 {actual_start} to {actual_end}",
+                                                xref="paper", yref="paper",
+                                                x=0.5, y=1.08, showarrow=False,
+                                                font=dict(size=10, color="gray")
+                                            )
+                                        ]
+                                    )
 
                                     st.plotly_chart(fig_multi, use_container_width=True, key=f"chart_multi_{tf_key}")
                                 else:
