@@ -408,79 +408,37 @@ SYMBOLS = {
     'Band Protocol (BAND)': 'BANDUSDT'
 }
 
-# SIMPLE INTERVAL SYSTEM - Just select interval, always fetch max candles (1000)
+# SIMPLE INTERVAL SYSTEM - Optimized timeframes for specific time ranges
 # User can scroll/zoom the chart to see historical data
 CHART_INTERVALS = {
-    '1m': {
-        'name': '1 Minute',
-        'interval': Client.KLINE_INTERVAL_1MINUTE,
-        'limit': 1000,  # ~16.6 hours of data
-        'ema_type': 'short',
-    },
-    '3m': {
-        'name': '3 Minutes',
-        'interval': Client.KLINE_INTERVAL_3MINUTE,
-        'limit': 1000,  # ~50 hours of data
-        'ema_type': 'short',
-    },
     '5m': {
         'name': '5 Minutes',
         'interval': Client.KLINE_INTERVAL_5MINUTE,
-        'limit': 1000,  # ~3.5 days of data
-        'ema_type': 'short',
-    },
-    '15m': {
-        'name': '15 Minutes',
-        'interval': Client.KLINE_INTERVAL_15MINUTE,
-        'limit': 1000,  # ~10 days of data
-        'ema_type': 'short',
-    },
-    '30m': {
-        'name': '30 Minutes',
-        'interval': Client.KLINE_INTERVAL_30MINUTE,
-        'limit': 1000,  # ~20 days of data
+        'limit': 288,  # Last 24 hours (1 day)
         'ema_type': 'short',
     },
     '1h': {
         'name': '1 Hour',
         'interval': Client.KLINE_INTERVAL_1HOUR,
-        'limit': 1000,  # ~41 days of data
-        'ema_type': 'mid',
-    },
-    '2h': {
-        'name': '2 Hours',
-        'interval': Client.KLINE_INTERVAL_2HOUR,
-        'limit': 1000,  # ~83 days of data
+        'limit': 168,  # Last 7 days (1 week)
         'ema_type': 'mid',
     },
     '4h': {
         'name': '4 Hours',
         'interval': Client.KLINE_INTERVAL_4HOUR,
-        'limit': 1000,  # ~166 days of data
+        'limit': 180,  # Last 30 days (1 month)
         'ema_type': 'mid',
-    },
-    '6h': {
-        'name': '6 Hours',
-        'interval': Client.KLINE_INTERVAL_6HOUR,
-        'limit': 1000,  # ~250 days of data
-        'ema_type': 'mid',
-    },
-    '12h': {
-        'name': '12 Hours',
-        'interval': Client.KLINE_INTERVAL_12HOUR,
-        'limit': 1000,  # ~500 days of data
-        'ema_type': 'long',
     },
     '1d': {
         'name': '1 Day',
         'interval': Client.KLINE_INTERVAL_1DAY,
-        'limit': 1000,  # ~2.7 years of data
+        'limit': 365,  # Last 12 months (1 year)
         'ema_type': 'long',
     },
     '1w': {
         'name': '1 Week',
         'interval': Client.KLINE_INTERVAL_1WEEK,
-        'limit': 1000,  # ~19 years of data
+        'limit': 104,  # Last 24 months (2 years)
         'ema_type': 'long',
     },
 }
@@ -644,15 +602,15 @@ def fetch_data_smart(symbol, timeframe_key):
     """
     # Map timeframe to days and optimal settings
     timeframe_config = {
-        '1D': {'days': 1, 'interval': Client.KLINE_INTERVAL_15MINUTE, 'limit': 96},      # 24h * 4 = 96 candles
-        '7D': {'days': 7, 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168},        # 7d * 24h = 168 candles
-        '30D': {'days': 30, 'interval': Client.KLINE_INTERVAL_2HOUR, 'limit': 360},      # 30d * 12 = 360 candles
-        '3M': {'days': 90, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 540},       # 90d * 6 = 540 candles
-        '6M': {'days': 180, 'interval': Client.KLINE_INTERVAL_6HOUR, 'limit': 720},      # 180d * 4 = 720 candles
-        '1Y': {'days': 365, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365},       # 365 daily candles
-        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1095},     # 3 years daily (will use chunking)
-        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1825},     # 5 years daily (will use chunking)
-        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520}     # 10 years weekly
+        '1D': {'days': 1, 'interval': Client.KLINE_INTERVAL_5MINUTE, 'limit': 288},      # 24h: 288 candles of 5m
+        '7D': {'days': 7, 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168},        # 7d: 168 candles of 1h
+        '30D': {'days': 30, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180},      # 30d: 180 candles of 4h
+        '3M': {'days': 90, 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 540},       # 90d: 540 candles of 4h
+        '6M': {'days': 180, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 180},       # 6m: 180 candles of 1d
+        '1Y': {'days': 365, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365},       # 1y: 365 candles of 1d
+        '3Y': {'days': 1095, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1095},     # 3y: 1095 candles of 1d (chunking)
+        '5Y': {'days': 1825, 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1825},     # 5y: 1825 candles of 1d (chunking)
+        'All': {'days': 3650, 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 520}     # 10y: 520 candles of 1w
     }
 
     config = timeframe_config.get(timeframe_key)
