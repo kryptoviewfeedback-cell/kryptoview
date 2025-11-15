@@ -528,8 +528,11 @@ def format_large_number(num):
         return f"${num:.2f}"
 
 # Cache functions
+# CACHE_VERSION is used to bust cache when we change data fetching logic
+CACHE_VERSION = "v2_free_api_optimized"
+
 @st.cache_data(ttl=60)  # Changed from 300 to 60 for faster refresh
-def fetch_data(symbol, interval, limit):
+def fetch_data(symbol, interval, limit, _cache_version=CACHE_VERSION):
     """Fetch data from Binance with CoinGecko fallback and chunked fetching for large limits"""
     if client is None:
         # Try CoinGecko as fallback
@@ -603,7 +606,7 @@ def fetch_data(symbol, interval, limit):
         return fetch_data_coingecko_fallback(symbol, limit)
 
 @st.cache_data(ttl=60)  # Changed from 600 to 60 for faster refresh
-def fetch_data_smart(symbol, timeframe_key):
+def fetch_data_smart(symbol, timeframe_key, _cache_version=CACHE_VERSION):
     """
     Smart data fetching based on timeframe with accurate date ranges:
     - Uses Binance for all timeframes for consistency and accuracy
