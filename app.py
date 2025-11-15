@@ -1844,84 +1844,100 @@ def backtest_fng(df, fng, symbol, interval):
     return entries, total_invested, final_value, daily_df
 
 @st.cache_data(ttl=3600)
-def fetch_coingecko_historical(coin_id, days):
-    """Fetch historical data from CoinGecko API"""
+def fetch_binance_historical(symbol, days):
+    """Fetch historical data from Binance API for seasonality analysis"""
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-        params = {
-            'vs_currency': 'usd',
-            'days': days
-            # Note: interval is auto-determined by CoinGecko based on 'days' value
-        }
-
-        # Add API key to headers if available
-        headers = {}
-        if COINGECKO_API_KEY:
-            headers['x-cg-demo-api-key'] = COINGECKO_API_KEY
-
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-
-        if response.status_code == 200:
-            data = response.json()
-
-            # Convert to DataFrame
-            prices = data.get('prices', [])
-            volumes = data.get('total_volumes', [])
-
-            df = pd.DataFrame(prices, columns=['timestamp', 'Close'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-
-            # Add volume data
-            if volumes:
-                vol_df = pd.DataFrame(volumes, columns=['timestamp', 'Volume'])
-                vol_df['timestamp'] = pd.to_datetime(vol_df['timestamp'], unit='ms')
-                df = df.merge(vol_df, on='timestamp', how='left')
-            else:
-                df['Volume'] = 0
-
-            # CoinGecko only provides close prices, so we'll use close as open/high/low
-            df['Open'] = df['Close']
-            df['High'] = df['Close']
-            df['Low'] = df['Close']
-
-            return df
-        else:
+        if client is None:
             return None
 
+        # Use daily candles for historical data
+        interval = Client.KLINE_INTERVAL_1DAY
+
+        # Binance allows max 1000 candles per request
+        # For more than 1000 days, we need to fetch in chunks
+        all_klines = []
+
+        if days <= 1000:
+            # Single request
+            klines = client.get_klines(symbol=symbol, interval=interval, limit=days)
+            all_klines = klines
+        else:
+            # Multiple requests (chunked)
+            end_time = int(time.time() * 1000)  # Current time in ms
+            chunk_size = 1000
+            chunks_needed = (days // chunk_size) + 1
+
+            for i in range(chunks_needed):
+                try:
+                    klines = client.get_klines(
+                        symbol=symbol,
+                        interval=interval,
+                        limit=chunk_size,
+                        endTime=end_time
+                    )
+
+                    if not klines:
+                        break
+
+                    all_klines = klines + all_klines  # Prepend older data
+
+                    # Update end_time to the timestamp of the oldest candle we just fetched
+                    end_time = int(klines[0][0]) - 1
+
+                    # Small delay to avoid rate limiting
+                    time.sleep(0.1)
+
+                except Exception as e:
+                    print(f"Error fetching chunk {i}: {e}")
+                    break
+
+        if not all_klines:
+            return None
+
+        # Convert to DataFrame
+        df = pd.DataFrame(all_klines, columns=[
+            'timestamp', 'Open', 'High', 'Low', 'Close', 'Volume',
+            'close_time', 'quote_volume', 'trades', 'taker_buy_base',
+            'taker_buy_quote', 'ignore'
+        ])
+
+        # Convert to proper types
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['Open'] = df['Open'].astype(float)
+        df['High'] = df['High'].astype(float)
+        df['Low'] = df['Low'].astype(float)
+        df['Close'] = df['Close'].astype(float)
+        df['Volume'] = df['Volume'].astype(float)
+
+        # Keep only necessary columns
+        df = df[['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']]
+
+        return df
+
     except Exception as e:
+        print(f"Error fetching Binance historical data: {e}")
         return None
 
 def analyze_seasonality(symbol, years=10):
     """
     Analyze historical seasonality patterns for a cryptocurrency.
     Returns monthly, weekly, and daily statistics.
-    Uses CoinGecko API for historical data.
+    Uses Binance API for historical data.
     """
     try:
-        # Map Binance symbols to CoinGecko IDs
-        coin_map = {
-            'BTCUSDT': 'bitcoin', 'ETHUSDT': 'ethereum', 'BNBUSDT': 'binancecoin',
-            'SOLUSDT': 'solana', 'XRPUSDT': 'ripple', 'ADAUSDT': 'cardano',
-            'AVAXUSDT': 'avalanche-2', 'DOGEUSDT': 'dogecoin', 'TRXUSDT': 'tron',
-            'DOTUSDT': 'polkadot', 'MATICUSDT': 'matic-network', 'LINKUSDT': 'chainlink',
-            'TONUSDT': 'the-open-network', 'SHIBUSDT': 'shiba-inu', 'LTCUSDT': 'litecoin',
-            'BCHUSDT': 'bitcoin-cash', 'UNIUSDT': 'uniswap', 'XLMUSDT': 'stellar',
-            'ATOMUSDT': 'cosmos', 'ETCUSDT': 'ethereum-classic'
-        }
-
-        coin_id = coin_map.get(symbol)
-        if not coin_id:
-            st.error(f"⚠️ Cryptocurrency {symbol} not supported for seasonality analysis.")
+        # Check if Binance client is available
+        if client is None:
+            st.error("⚠️ Binance API not available. Cannot fetch historical data.")
             return None
 
         total_days = years * 365
 
-        with st.spinner(f'📥 Fetching {years} years of historical data from CoinGecko...'):
-            df = fetch_coingecko_historical(coin_id, total_days)
+        with st.spinner(f'📥 Fetching {years} years of historical data from Binance...'):
+            df = fetch_binance_historical(symbol, total_days)
 
         # Check if data was fetched successfully
         if df is None or df.empty:
-            st.error("⚠️ Unable to fetch historical data from CoinGecko. Please try again later.")
+            st.error("⚠️ Unable to fetch historical data from Binance. Please try again later.")
             return None
 
         # Sort by timestamp (oldest first)
@@ -2539,8 +2555,8 @@ if mode == "📈 Chart Analysis":
                 # Multiple Timeframes Toggle
                 multi_tf_view = st.checkbox("📊 Multiple Timeframes View (1h, 4h, 1d, 1w)", value=False, key="multi_tf_toggle")
 
-                # Top Control Bar - 4 sections in one row
-                col_crypto, col_timeframe, col_indicators, col_soon = st.columns([1, 1, 1, 1])
+                # Top Control Bar - 5 sections in one row
+                col_crypto, col_chart_type, col_timeframe, col_indicators, col_soon = st.columns([1, 0.8, 1, 1, 1])
 
                 # 1. CRYPTOCURRENCY SELECTOR (Light Orange)
                 with col_crypto:
@@ -2570,7 +2586,33 @@ if mode == "📈 Chart Analysis":
                     else:
                         symbol = SYMBOLS[crypto_name]
 
-                # 2. TIMEFRAME SELECTOR (Light Blue) - UNIFIED SYSTEM
+                # 2. CHART TYPE SELECTOR (Light Yellow)
+                with col_chart_type:
+                    st.markdown("""
+                    <div style='background: linear-gradient(135deg, rgba(255, 235, 59, 0.3) 0%, rgba(255, 241, 118, 0.25) 100%);
+                                padding: 4px; border-radius: 6px; margin-bottom: 4px; text-align: center;
+                                border: 1px solid rgba(255, 235, 59, 0.4);'>
+                        <p style='margin: 0; color: #FDD835; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;'>
+                            📈 CHART
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Initialize chart_type in session state if not exists
+                    if 'chart_type' not in st.session_state:
+                        st.session_state.chart_type = 'Line'
+
+                    chart_type = st.radio(
+                        "Chart Type:",
+                        options=['Line', 'Candlestick'],
+                        index=0 if st.session_state.chart_type == 'Line' else 1,
+                        key="chart_type_selector",
+                        label_visibility="collapsed",
+                        horizontal=False
+                    )
+                    st.session_state.chart_type = chart_type
+
+                # 3. TIMEFRAME SELECTOR (Light Blue) - UNIFIED SYSTEM
                 with col_timeframe:
                     st.markdown("""
                     <div style='background: linear-gradient(135deg, rgba(66, 165, 245, 0.3) 0%, rgba(100, 181, 246, 0.25) 100%);
@@ -2610,7 +2652,7 @@ if mode == "📈 Chart Analysis":
                         st.session_state['chart_interval'] = selected_interval_key
                         st.rerun()
 
-                # 3. INDICATORS MULTISELECT (Light Green)
+                # 4. INDICATORS MULTISELECT (Light Green)
                 with col_indicators:
                     st.markdown("""
                     <div style='background: linear-gradient(135deg, rgba(102, 187, 106, 0.3) 0%, rgba(129, 199, 132, 0.25) 100%);
@@ -2647,21 +2689,7 @@ if mode == "📈 Chart Analysis":
                     show_stoch = False
                     show_atr = False
 
-                    # Chart Type Selector (Line vs Candlestick)
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if 'chart_type' not in st.session_state:
-                        st.session_state.chart_type = 'Line'
-
-                    chart_type = st.radio(
-                        "Chart Type:",
-                        options=['Line', 'Candlestick'],
-                        index=0 if st.session_state.chart_type == 'Line' else 1,
-                        key="chart_type_selector",
-                        horizontal=True
-                    )
-                    st.session_state.chart_type = chart_type
-
-                # 4. SOON BUTTON (Light Purple - Disabled)
+                # 5. SOON BUTTON (Light Purple - Disabled)
                 with col_soon:
                     st.markdown("""
                     <div style='background: linear-gradient(135deg, rgba(149, 117, 205, 0.3) 0%, rgba(171, 71, 188, 0.25) 100%);
