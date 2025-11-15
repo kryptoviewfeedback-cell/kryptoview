@@ -605,6 +605,76 @@ def fetch_data(symbol, interval, limit, _cache_version=CACHE_VERSION):
         print(f"Binance error: {e}, trying CoinGecko fallback...")
         return fetch_data_coingecko_fallback(symbol, limit)
 
+def fetch_data_no_cache(symbol, interval, limit):
+    """
+    Fetch data WITHOUT CACHE - for debugging and forcing fresh data
+    """
+    if client is None:
+        return pd.DataFrame()
+
+    try:
+        print(f"🔴 NO CACHE: Fetching {limit} candles for {symbol} ({interval})")
+
+        # Binance allows max 1000 candles per request
+        if limit <= 1000:
+            klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+            print(f"📊 NO CACHE: Fetched {len(klines)} candles")
+        else:
+            # Multiple requests needed
+            all_klines = []
+            chunks_needed = (limit // 1000) + 1
+            remaining = limit
+            end_time = int(datetime.now().timestamp() * 1000)
+
+            for i in range(chunks_needed):
+                try:
+                    chunk_size = min(1000, remaining)
+                    chunk = client.get_klines(
+                        symbol=symbol,
+                        interval=interval,
+                        limit=chunk_size,
+                        endTime=end_time
+                    )
+
+                    if not chunk:
+                        break
+
+                    all_klines = chunk + all_klines
+                    remaining -= len(chunk)
+                    end_time = int(chunk[0][0]) - 1
+
+                    if remaining <= 0:
+                        break
+
+                except Exception as e:
+                    print(f"Error fetching chunk {i}: {e}")
+                    break
+
+            klines = all_klines
+            if len(klines) > limit:
+                klines = klines[-limit:]
+
+            print(f"📊 NO CACHE: Fetched {len(klines)} candles in {chunks_needed} chunks")
+
+        if not klines:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(klines, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume',
+                                           'Close_time', 'Quote_asset_volume', 'Number_of_trades',
+                                           'Taker_buy_base_volume', 'Taker_buy_quote_volume', 'Ignore'])
+        df['Close'] = df['Close'].astype(float)
+        df['High'] = df['High'].astype(float)
+        df['Low'] = df['Low'].astype(float)
+        df['Volume'] = df['Volume'].astype(float)
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+
+        print(f"✅ NO CACHE: Returning {len(df)} rows from {df['timestamp'].min()} to {df['timestamp'].max()}")
+        return df
+
+    except Exception as e:
+        print(f"❌ NO CACHE ERROR: {e}")
+        return pd.DataFrame()
+
 @st.cache_data(ttl=60)  # Changed from 600 to 60 for faster refresh
 def fetch_data_smart(symbol, timeframe_key, _cache_version=CACHE_VERSION):
     """
@@ -2833,8 +2903,8 @@ if mode == "📈 Chart Analysis":
                                 tf_config = timeframes_multi[tf_key]
 
                                 with st.spinner(f'Loading {tf_config["title"]} data...'):
-                                    # Fetch with explicit limit
-                                    df_multi = fetch_data(symbol, tf_config['interval'], limit=tf_config['limit'])
+                                    # USE NO CACHE FUNCTION to force fresh data
+                                    df_multi = fetch_data_no_cache(symbol, tf_config['interval'], limit=tf_config['limit'])
 
                                     # Debug logging
                                     if not df_multi.empty:
