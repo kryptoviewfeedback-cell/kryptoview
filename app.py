@@ -2071,6 +2071,15 @@ def analyze_seasonality(symbol, years=10):
 def get_hardcoded_seasonality_data():
     """Return hardcoded Bitcoin seasonality data for display purposes"""
 
+    # Get current time in EU timezone (UTC+2)
+    from datetime import datetime
+    import pytz
+    eu_tz = pytz.timezone('Europe/Athens')  # UTC+2
+    now = datetime.now(eu_tz)
+    current_year = now.year
+    current_month = now.month
+    current_quarter = (current_month - 1) // 3 + 1  # Q1=1-3, Q2=4-6, Q3=7-9, Q4=10-12
+
     # Hardcoded Quarterly Returns (Q1, Q2, Q3, Q4) for years 2017-2025
     quarterly_data = {
         'Time': ['2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', 'Average', 'Median'],
@@ -2094,8 +2103,25 @@ def get_hardcoded_seasonality_data():
         'September': [7.35, 6.90, -4.49, -2.89, -7.35, -7.35, -14.70, -6.35, 7.90, -2.33, -2.89],
         'October': [-10.46, 10.46, -0.49, 5.85, 39.85, -11.23, -6.23, -5.23, 47.23, 7.75, 5.85],
         'November': [-8.30, -8.30, 8.30, -16.30, 0.30, 43.12, -18.10, -18.10, 45.08, 3.08, -8.30],
-        'December': [-0.70, -0.70, -0.70, -2.58, -19.19, 47.27, -6.10, -43.59, 27.30, 0.11, -0.70]
+        'December': [None, -0.70, -0.70, -2.58, -19.19, 47.27, -6.10, -43.59, 27.30, 0.11, -0.70]
     }
+
+    # Dynamically set future months/quarters to None for current year
+    if current_year == 2025:
+        year_index = 0  # 2025 is at index 0
+
+        # Set future quarters to None
+        quarters = ['Q1', 'Q2', 'Q3', 'Q4']
+        for q_idx, quarter in enumerate(quarters, 1):
+            if q_idx > current_quarter:
+                quarterly_data[quarter][year_index] = None
+
+        # Set future months to None
+        month_names = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December']
+        for m_idx, month_name in enumerate(month_names, 1):
+            if m_idx > current_month:
+                monthly_data[month_name][year_index] = None
 
     # Create a dummy DataFrame for compatibility with weekly calculations
     import pandas as pd
