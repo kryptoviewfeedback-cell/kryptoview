@@ -408,24 +408,7 @@ SYMBOLS = {
     'Band Protocol (BAND)': 'BANDUSDT'
 }
 
-"""
-# OLD UNIFIED_TIMEFRAMES SYSTEM (KEPT FOR REFERENCE - MAY BE USEFUL LATER)
-# This was a combined interval+range system that we replaced with simple interval selector
-UNIFIED_TIMEFRAMES_OLD = {
-    '1m_12h': {'name': '1m (Last 12 hours)', 'interval': Client.KLINE_INTERVAL_1MINUTE, 'limit': 720, 'ema_type': 'short', 'interval_key': '1m'},
-    '5m_24h': {'name': '5m (Last 24 hours)', 'interval': Client.KLINE_INTERVAL_5MINUTE, 'limit': 288, 'ema_type': 'short', 'interval_key': '5m'},
-    '15m_3d': {'name': '15m (Last 3 days)', 'interval': Client.KLINE_INTERVAL_15MINUTE, 'limit': 288, 'ema_type': 'short', 'interval_key': '15m'},
-    '30m_7d': {'name': '30m (Last 7 days)', 'interval': Client.KLINE_INTERVAL_30MINUTE, 'limit': 336, 'ema_type': 'short', 'interval_key': '30m'},
-    '1h_14d': {'name': '1h (Last 14 days)', 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 336, 'ema_type': 'mid', 'interval_key': '1h'},
-    '4h_30d': {'name': '4h (Last 30 days)', 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'ema_type': 'mid', 'interval_key': '4h'},
-    '1d_90d': {'name': '1d (Last 3 months)', 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 90, 'ema_type': 'mid', 'interval_key': '1d'},
-    '1d_1y': {'name': '1d (Last year)', 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'ema_type': 'long', 'interval_key': '1d'},
-    '1d_3y': {'name': '1d (Last 3 years)', 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1095, 'ema_type': 'long', 'interval_key': '1d'},
-    '1w_5y': {'name': '1w (Last 5 years)', 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 260, 'ema_type': 'long', 'interval_key': '1w'},
-}
-"""
-
-# NEW SIMPLE INTERVAL SYSTEM - Just select interval, always fetch max candles (1000)
+# SIMPLE INTERVAL SYSTEM - Just select interval, always fetch max candles (1000)
 # User can scroll/zoom the chart to see historical data
 CHART_INTERVALS = {
     '1m': {
