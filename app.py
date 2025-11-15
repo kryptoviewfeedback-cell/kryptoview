@@ -2801,30 +2801,46 @@ if mode == "📈 Chart Analysis":
                 # Chart with selected timeframe data
                 if not df_chart.empty:
                     if multi_tf_view:
-                        # Multiple Timeframes View - 4 charts in 2x2 grid
-                        st.markdown("### 📊 Multiple Timeframes Analysis")
+                        # Multiple Timeframes View - 5 charts
+                        col_title, col_clear = st.columns([4, 1])
+                        with col_title:
+                            st.markdown("### 📊 Multiple Timeframes Analysis")
+                        with col_clear:
+                            if st.button("🔄 Clear Cache", key="clear_cache_btn"):
+                                st.cache_data.clear()
+                                st.success("✅ Cache cleared! Refresh to reload data.")
+                                st.rerun()
 
-                        # Fetch data for all 4 timeframes (optimized for specific time ranges)
+                        # Fetch data for all timeframes with EXPLICIT limits (NO CACHE!)
+                        # Using direct values to avoid cache issues
                         timeframes_multi = {
+                            '5m': {'interval': Client.KLINE_INTERVAL_5MINUTE, 'limit': 288, 'title': '5 Minutes', 'range': 'Last 24 hours'},
                             '1h': {'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'title': '1 Hour', 'range': 'Last 7 days'},
                             '4h': {'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'title': '4 Hours', 'range': 'Last 30 days'},
                             '1d': {'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'title': '1 Day', 'range': 'Last 1 year'},
                             '1w': {'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 104, 'title': '1 Week', 'range': 'Last 2 years'}
                         }
 
-                        # Create 2x2 grid
-                        row1_col1, row1_col2 = st.columns(2)
+                        # Create grid for 5 timeframes (2 rows: 3 + 2)
+                        row1_col1, row1_col2, row1_col3 = st.columns(3)
                         row2_col1, row2_col2 = st.columns(2)
 
-                        cols = [row1_col1, row1_col2, row2_col1, row2_col2]
-                        tf_keys = ['1h', '4h', '1d', '1w']
+                        cols = [row1_col1, row1_col2, row1_col3, row2_col1, row2_col2]
+                        tf_keys = ['5m', '1h', '4h', '1d', '1w']
 
                         for idx, (tf_key, col) in enumerate(zip(tf_keys, cols)):
                             with col:
                                 tf_config = timeframes_multi[tf_key]
 
                                 with st.spinner(f'Loading {tf_config["title"]} data...'):
+                                    # Fetch with explicit limit
                                     df_multi = fetch_data(symbol, tf_config['interval'], limit=tf_config['limit'])
+
+                                    # Debug logging
+                                    if not df_multi.empty:
+                                        actual_candles = len(df_multi)
+                                        date_range = f"{df_multi['timestamp'].min()} to {df_multi['timestamp'].max()}"
+                                        print(f"🔍 {tf_key}: Requested {tf_config['limit']} candles, got {actual_candles} | {date_range}")
 
                                 if not df_multi.empty:
                                     # Calculate indicators for this timeframe
