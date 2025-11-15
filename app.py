@@ -2834,12 +2834,12 @@ if mode == "📈 Chart Analysis":
                         # Multiple Timeframes View - 4 charts in 2x2 grid
                         st.markdown("### 📊 Multiple Timeframes Analysis")
 
-                        # Fetch data for all 4 timeframes
+                        # Fetch data for all 4 timeframes (optimized for specific time ranges)
                         timeframes_multi = {
-                            '1h': {'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'title': '1 Hour'},
-                            '4h': {'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'title': '4 Hours'},
-                            '1d': {'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 180, 'title': '1 Day'},
-                            '1w': {'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 104, 'title': '1 Week'}
+                            '1h': {'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 168, 'title': '1 Hour'},      # Last 7 days
+                            '4h': {'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'title': '4 Hours'},     # Last 30 days
+                            '1d': {'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'title': '1 Day'},        # Last 1 year
+                            '1w': {'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 104, 'title': '1 Week'}       # Last 2 years
                         }
 
                         # Create 2x2 grid
