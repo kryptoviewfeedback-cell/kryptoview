@@ -408,20 +408,78 @@ SYMBOLS = {
     'Band Protocol (BAND)': 'BANDUSDT'
 }
 
-# Timeframe options (interval only, user can zoom/pan to see any range)
-TIMEFRAME_OPTIONS = {
-    '1m': {'interval': Client.KLINE_INTERVAL_1MINUTE, 'name': '1 Minute'},
-    '5m': {'interval': Client.KLINE_INTERVAL_5MINUTE, 'name': '5 Minutes'},
-    '15m': {'interval': Client.KLINE_INTERVAL_15MINUTE, 'name': '15 Minutes'},
-    '30m': {'interval': Client.KLINE_INTERVAL_30MINUTE, 'name': '30 Minutes'},
-    '1h': {'interval': Client.KLINE_INTERVAL_1HOUR, 'name': '1 Hour'},
-    '2h': {'interval': Client.KLINE_INTERVAL_2HOUR, 'name': '2 Hours'},
-    '4h': {'interval': Client.KLINE_INTERVAL_4HOUR, 'name': '4 Hours'},
-    '6h': {'interval': Client.KLINE_INTERVAL_6HOUR, 'name': '6 Hours'},
-    '12h': {'interval': Client.KLINE_INTERVAL_12HOUR, 'name': '12 Hours'},
-    '1d': {'interval': Client.KLINE_INTERVAL_1DAY, 'name': '1 Day'},
-    '3d': {'interval': Client.KLINE_INTERVAL_3DAY, 'name': '3 Days'},
-    '1w': {'interval': Client.KLINE_INTERVAL_1WEEK, 'name': '1 Week'},
+# Unified Timeframe System - Combines interval + range for accurate charts
+UNIFIED_TIMEFRAMES = {
+    '1m_12h': {
+        'name': '1m (Last 12 hours)',
+        'interval': Client.KLINE_INTERVAL_1MINUTE,
+        'limit': 720,  # 12h * 60m = 720 candles
+        'ema_type': 'short',
+        'interval_key': '1m'
+    },
+    '5m_24h': {
+        'name': '5m (Last 24 hours)',
+        'interval': Client.KLINE_INTERVAL_5MINUTE,
+        'limit': 288,  # 24h * 12 = 288 candles
+        'ema_type': 'short',
+        'interval_key': '5m'
+    },
+    '15m_3d': {
+        'name': '15m (Last 3 days)',
+        'interval': Client.KLINE_INTERVAL_15MINUTE,
+        'limit': 288,  # 3d * 96 = 288 candles
+        'ema_type': 'short',
+        'interval_key': '15m'
+    },
+    '30m_7d': {
+        'name': '30m (Last 7 days)',
+        'interval': Client.KLINE_INTERVAL_30MINUTE,
+        'limit': 336,  # 7d * 48 = 336 candles
+        'ema_type': 'short',
+        'interval_key': '30m'
+    },
+    '1h_14d': {
+        'name': '1h (Last 14 days)',
+        'interval': Client.KLINE_INTERVAL_1HOUR,
+        'limit': 336,  # 14d * 24 = 336 candles
+        'ema_type': 'mid',
+        'interval_key': '1h'
+    },
+    '4h_30d': {
+        'name': '4h (Last 30 days)',
+        'interval': Client.KLINE_INTERVAL_4HOUR,
+        'limit': 180,  # 30d * 6 = 180 candles
+        'ema_type': 'mid',
+        'interval_key': '4h'
+    },
+    '1d_90d': {
+        'name': '1d (Last 3 months)',
+        'interval': Client.KLINE_INTERVAL_1DAY,
+        'limit': 90,  # 90 daily candles
+        'ema_type': 'mid',
+        'interval_key': '1d'
+    },
+    '1d_1y': {
+        'name': '1d (Last year)',
+        'interval': Client.KLINE_INTERVAL_1DAY,
+        'limit': 365,  # 365 daily candles
+        'ema_type': 'long',
+        'interval_key': '1d'
+    },
+    '1d_3y': {
+        'name': '1d (Last 3 years)',
+        'interval': Client.KLINE_INTERVAL_1DAY,
+        'limit': 1095,  # 3 years daily (uses chunking)
+        'ema_type': 'long',
+        'interval_key': '1d'
+    },
+    '1w_5y': {
+        'name': '1w (Last 5 years)',
+        'interval': Client.KLINE_INTERVAL_1WEEK,
+        'limit': 260,  # 5 years weekly
+        'ema_type': 'long',
+        'interval_key': '1w'
+    },
 }
 
 # Keep TIME_OPTIONS for Backtest mode only
@@ -2283,16 +2341,19 @@ default_index = crypto_list.index(st.session_state['selected_crypto']) if st.ses
 crypto_name = st.session_state['selected_crypto']
 symbol = SYMBOLS[crypto_name]
 
-# Set default timeframe if not in session state (for Chart Analysis)
-if 'timeframe' not in st.session_state:
-    st.session_state['timeframe'] = '4h'
-timeframe = st.session_state.get('timeframe', '4h')
+# Set default unified timeframe if not in session state (for Chart Analysis)
+if 'unified_timeframe' not in st.session_state:
+    st.session_state['unified_timeframe'] = '4h_30d'  # Default: 4h candles, last 30 days
+unified_timeframe = st.session_state.get('unified_timeframe', '4h_30d')
 
 # Get data (only for Chart Analysis mode - other modes don't need it)
 if mode == "📈 Chart Analysis":
-    # For Chart Analysis, fetch maximum data (1000 candles) for zoom/pan
-    interval = TIMEFRAME_OPTIONS[timeframe]['interval']
-    limit = 1000  # Maximum allowed by Binance
+    # Get timeframe configuration
+    tf_config = UNIFIED_TIMEFRAMES[unified_timeframe]
+    interval = tf_config['interval']
+    limit = tf_config['limit']
+    ema_type = tf_config['ema_type']
+    interval_key = tf_config['interval_key']
 
     with st.spinner('Loading data...'):
         df = fetch_data(symbol, interval, limit=limit)
@@ -2300,16 +2361,9 @@ if mode == "📈 Chart Analysis":
     if df.empty:
         st.error("⚠️ Failed to fetch data. Please try again.")
     else:
-        # Calculate indicators for Chart Analysis
-        # Use dynamic EMA based on timeframe
-        if timeframe in ['1m', '5m', '15m', '30m']:
-            ema_type = 'short'
-        elif timeframe in ['1h', '2h', '4h']:
-            ema_type = 'mid'
-        else:
-            ema_type = 'long'
-        # Pass timeframe to calculate_indicators for proper period adjustment
-        df, ema1, ema2 = calculate_indicators(df, ema_type, timeframe=timeframe)
+        # Calculate indicators for Chart Analysis using the configured EMA type
+        # Pass interval_key to calculate_indicators for proper period adjustment
+        df, ema1, ema2 = calculate_indicators(df, ema_type, timeframe=interval_key)
 
         # Chart Analysis Page - Reorganized Layout
         # Left: Chart | Right: Metrics + F&G + OI
@@ -2345,36 +2399,23 @@ if mode == "📈 Chart Analysis":
             # Calculate volume first
             # Calculate 24h volume
             if mode == "📈 Chart Analysis":
-                if timeframe in ['1m', '5m']:
-                    candles_24h = 1440 if timeframe == '1m' else 288
+                if interval_key in ['1m', '5m']:
+                    candles_24h = 1440 if interval_key == '1m' else 288
                     volume_24h = df.tail(candles_24h)['Volume'].sum() if len(df) >= candles_24h else df['Volume'].sum()
-                elif timeframe == '15m':
+                elif interval_key == '15m':
                     volume_24h = df.tail(96)['Volume'].sum() if len(df) >= 96 else df['Volume'].sum()
-                elif timeframe == '30m':
+                elif interval_key == '30m':
                     volume_24h = df.tail(48)['Volume'].sum() if len(df) >= 48 else df['Volume'].sum()
-                elif timeframe == '1h':
+                elif interval_key == '1h':
                     volume_24h = df.tail(24)['Volume'].sum() if len(df) >= 24 else df['Volume'].sum()
-                elif timeframe == '2h':
+                elif interval_key == '2h':
                     volume_24h = df.tail(12)['Volume'].sum() if len(df) >= 12 else df['Volume'].sum()
-                elif timeframe == '4h':
+                elif interval_key == '4h':
                     volume_24h = df.tail(6)['Volume'].sum() if len(df) >= 6 else df['Volume'].sum()
-                elif timeframe == '6h':
+                elif interval_key == '6h':
                     volume_24h = df.tail(4)['Volume'].sum() if len(df) >= 4 else df['Volume'].sum()
-                elif timeframe == '12h':
+                elif interval_key == '12h':
                     volume_24h = df.tail(2)['Volume'].sum() if len(df) >= 2 else df['Volume'].sum()
-                else:
-                    volume_24h = last['Volume']
-            else:
-                if period == '1 Day':
-                    volume_24h = df['Volume'].sum()
-                elif period == '3 Days':
-                    volume_24h = df.tail(24)['Volume'].sum() if len(df) >= 24 else df['Volume'].sum()
-                elif period == '7 Days':
-                    volume_24h = df.tail(12)['Volume'].sum() if len(df) >= 12 else df['Volume'].sum()
-                elif period == '14 Days':
-                    volume_24h = df.tail(6)['Volume'].sum() if len(df) >= 6 else df['Volume'].sum()
-                elif period == '1 Month':
-                    volume_24h = df.tail(4)['Volume'].sum() if len(df) >= 4 else df['Volume'].sum()
                 else:
                     volume_24h = last['Volume']
 
@@ -2382,50 +2423,31 @@ if mode == "📈 Chart Analysis":
 
             # Calculate 24h range
             if mode == "📈 Chart Analysis":
-                if timeframe in ['1m', '5m']:
-                    candles_24h = 1440 if timeframe == '1m' else 288
+                if interval_key in ['1m', '5m']:
+                    candles_24h = 1440 if interval_key == '1m' else 288
                     high_24h = df.tail(candles_24h)['High'].max() if len(df) >= candles_24h else df['High'].max()
                     low_24h = df.tail(candles_24h)['Low'].min() if len(df) >= candles_24h else df['Low'].min()
-                elif timeframe == '15m':
+                elif interval_key == '15m':
                     high_24h = df.tail(96)['High'].max() if len(df) >= 96 else df['High'].max()
                     low_24h = df.tail(96)['Low'].min() if len(df) >= 96 else df['Low'].min()
-                elif timeframe == '30m':
+                elif interval_key == '30m':
                     high_24h = df.tail(48)['High'].max() if len(df) >= 48 else df['High'].max()
                     low_24h = df.tail(48)['Low'].min() if len(df) >= 48 else df['Low'].min()
-                elif timeframe == '1h':
+                elif interval_key == '1h':
                     high_24h = df.tail(24)['High'].max() if len(df) >= 24 else df['High'].max()
                     low_24h = df.tail(24)['Low'].min() if len(df) >= 24 else df['Low'].min()
-                elif timeframe == '2h':
+                elif interval_key == '2h':
                     high_24h = df.tail(12)['High'].max() if len(df) >= 12 else df['High'].max()
                     low_24h = df.tail(12)['Low'].min() if len(df) >= 12 else df['Low'].min()
-                elif timeframe == '4h':
+                elif interval_key == '4h':
                     high_24h = df.tail(6)['High'].max() if len(df) >= 6 else df['High'].max()
                     low_24h = df.tail(6)['Low'].min() if len(df) >= 6 else df['Low'].min()
-                elif timeframe == '6h':
+                elif interval_key == '6h':
                     high_24h = df.tail(4)['High'].max() if len(df) >= 4 else df['High'].max()
                     low_24h = df.tail(4)['Low'].min() if len(df) >= 4 else df['Low'].min()
-                elif timeframe == '12h':
+                elif interval_key == '12h':
                     high_24h = df.tail(2)['High'].max() if len(df) >= 2 else df['High'].max()
                     low_24h = df.tail(2)['Low'].min() if len(df) >= 2 else df['Low'].min()
-                else:
-                    high_24h = last['High']
-                    low_24h = last['Low']
-            else:
-                if period == '1 Day':
-                    high_24h = df['High'].max()
-                    low_24h = df['Low'].min()
-                elif period == '3 Days':
-                    high_24h = df.tail(24)['High'].max() if len(df) >= 24 else df['High'].max()
-                    low_24h = df.tail(24)['Low'].min() if len(df) >= 24 else df['Low'].min()
-                elif period == '7 Days':
-                    high_24h = df.tail(12)['High'].max() if len(df) >= 12 else df['High'].max()
-                    low_24h = df.tail(12)['Low'].min() if len(df) >= 12 else df['Low'].min()
-                elif period == '14 Days':
-                    high_24h = df.tail(6)['High'].max() if len(df) >= 6 else df['High'].max()
-                    low_24h = df.tail(6)['Low'].min() if len(df) >= 6 else df['Low'].min()
-                elif period == '1 Month':
-                    high_24h = df.tail(4)['High'].max() if len(df) >= 4 else df['High'].max()
-                    low_24h = df.tail(4)['Low'].min() if len(df) >= 4 else df['Low'].min()
                 else:
                     high_24h = last['High']
                     low_24h = last['Low']
@@ -2530,7 +2552,7 @@ if mode == "📈 Chart Analysis":
                     else:
                         symbol = SYMBOLS[crypto_name]
 
-                # 2. TIMEFRAME SELECTOR (Light Blue)
+                # 2. TIMEFRAME SELECTOR (Light Blue) - UNIFIED SYSTEM
                 with col_timeframe:
                     st.markdown("""
                     <div style='background: linear-gradient(135deg, rgba(66, 165, 245, 0.3) 0%, rgba(100, 181, 246, 0.25) 100%);
@@ -2542,22 +2564,32 @@ if mode == "📈 Chart Analysis":
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Initialize chart_timeframe in session state if not exists
-                    if 'chart_timeframe' not in st.session_state:
-                        st.session_state['chart_timeframe'] = '30D'
+                    # Initialize unified_timeframe in session state if not exists
+                    if 'unified_timeframe' not in st.session_state:
+                        st.session_state['unified_timeframe'] = '4h_30d'
 
-                    timeframe_list = ['1D', '7D', '30D', '3M', '6M', '1Y', '3Y', '5Y', 'All']
-                    selected_tf = st.selectbox(
+                    # Get list of timeframe keys and names
+                    timeframe_keys = list(UNIFIED_TIMEFRAMES.keys())
+                    timeframe_names = [UNIFIED_TIMEFRAMES[k]['name'] for k in timeframe_keys]
+
+                    # Find current index
+                    current_tf = st.session_state['unified_timeframe']
+                    current_index = timeframe_keys.index(current_tf) if current_tf in timeframe_keys else 5  # Default to 4h_30d
+
+                    selected_tf_name = st.selectbox(
                         "Choose timeframe:",
-                        timeframe_list,
-                        index=timeframe_list.index(st.session_state['chart_timeframe']),
-                        key="chart_tf_selector",
+                        timeframe_names,
+                        index=current_index,
+                        key="unified_tf_selector",
                         label_visibility="collapsed"
                     )
 
+                    # Get the key from the selected name
+                    selected_tf_key = timeframe_keys[timeframe_names.index(selected_tf_name)]
+
                     # Update session state if changed
-                    if selected_tf != st.session_state['chart_timeframe']:
-                        st.session_state['chart_timeframe'] = selected_tf
+                    if selected_tf_key != st.session_state['unified_timeframe']:
+                        st.session_state['unified_timeframe'] = selected_tf_key
                         st.rerun()
 
                 # 3. INDICATORS MULTISELECT (Light Green)
@@ -2616,23 +2648,11 @@ if mode == "📈 Chart Analysis":
                     </div>
                     """, unsafe_allow_html=True)
 
-                # Fetch data based on selected timeframe using smart fetching
-                chart_tf = st.session_state['chart_timeframe']
-
-                # Fetch chart data using smart function
-                with st.spinner(f'Loading {chart_tf} data...'):
-                    df_chart = fetch_data_smart(symbol, chart_tf)
-
-                if not df_chart.empty:
-                    # Calculate indicators for chart data
-                    if chart_tf in ['1D', '7D', '30D']:
-                        ema_type_chart = 'short'
-                    elif chart_tf in ['3M', '6M']:
-                        ema_type_chart = 'mid'
-                    else:
-                        ema_type_chart = 'long'
-
-                    df_chart, ema1_chart, ema2_chart = calculate_indicators(df_chart, ema_type_chart)
+                # Use the already loaded df from unified timeframe
+                # No need to fetch again - we already have it from the main data fetch above
+                df_chart = df
+                ema1_chart = ema1
+                ema2_chart = ema2
 
                 # Advanced Configuration Panel (only show if EMA is enabled)
                 if show_ema:
