@@ -408,77 +408,97 @@ SYMBOLS = {
     'Band Protocol (BAND)': 'BANDUSDT'
 }
 
-# Unified Timeframe System - Combines interval + range for accurate charts
-UNIFIED_TIMEFRAMES = {
-    '1m_12h': {
-        'name': '1m (Last 12 hours)',
+"""
+# OLD UNIFIED_TIMEFRAMES SYSTEM (KEPT FOR REFERENCE - MAY BE USEFUL LATER)
+# This was a combined interval+range system that we replaced with simple interval selector
+UNIFIED_TIMEFRAMES_OLD = {
+    '1m_12h': {'name': '1m (Last 12 hours)', 'interval': Client.KLINE_INTERVAL_1MINUTE, 'limit': 720, 'ema_type': 'short', 'interval_key': '1m'},
+    '5m_24h': {'name': '5m (Last 24 hours)', 'interval': Client.KLINE_INTERVAL_5MINUTE, 'limit': 288, 'ema_type': 'short', 'interval_key': '5m'},
+    '15m_3d': {'name': '15m (Last 3 days)', 'interval': Client.KLINE_INTERVAL_15MINUTE, 'limit': 288, 'ema_type': 'short', 'interval_key': '15m'},
+    '30m_7d': {'name': '30m (Last 7 days)', 'interval': Client.KLINE_INTERVAL_30MINUTE, 'limit': 336, 'ema_type': 'short', 'interval_key': '30m'},
+    '1h_14d': {'name': '1h (Last 14 days)', 'interval': Client.KLINE_INTERVAL_1HOUR, 'limit': 336, 'ema_type': 'mid', 'interval_key': '1h'},
+    '4h_30d': {'name': '4h (Last 30 days)', 'interval': Client.KLINE_INTERVAL_4HOUR, 'limit': 180, 'ema_type': 'mid', 'interval_key': '4h'},
+    '1d_90d': {'name': '1d (Last 3 months)', 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 90, 'ema_type': 'mid', 'interval_key': '1d'},
+    '1d_1y': {'name': '1d (Last year)', 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 365, 'ema_type': 'long', 'interval_key': '1d'},
+    '1d_3y': {'name': '1d (Last 3 years)', 'interval': Client.KLINE_INTERVAL_1DAY, 'limit': 1095, 'ema_type': 'long', 'interval_key': '1d'},
+    '1w_5y': {'name': '1w (Last 5 years)', 'interval': Client.KLINE_INTERVAL_1WEEK, 'limit': 260, 'ema_type': 'long', 'interval_key': '1w'},
+}
+"""
+
+# NEW SIMPLE INTERVAL SYSTEM - Just select interval, always fetch max candles (1000)
+# User can scroll/zoom the chart to see historical data
+CHART_INTERVALS = {
+    '1m': {
+        'name': '1 Minute',
         'interval': Client.KLINE_INTERVAL_1MINUTE,
-        'limit': 720,  # 12h * 60m = 720 candles
+        'limit': 1000,  # ~16.6 hours of data
         'ema_type': 'short',
-        'interval_key': '1m'
     },
-    '5m_24h': {
-        'name': '5m (Last 24 hours)',
+    '3m': {
+        'name': '3 Minutes',
+        'interval': Client.KLINE_INTERVAL_3MINUTE,
+        'limit': 1000,  # ~50 hours of data
+        'ema_type': 'short',
+    },
+    '5m': {
+        'name': '5 Minutes',
         'interval': Client.KLINE_INTERVAL_5MINUTE,
-        'limit': 288,  # 24h * 12 = 288 candles
+        'limit': 1000,  # ~3.5 days of data
         'ema_type': 'short',
-        'interval_key': '5m'
     },
-    '15m_3d': {
-        'name': '15m (Last 3 days)',
+    '15m': {
+        'name': '15 Minutes',
         'interval': Client.KLINE_INTERVAL_15MINUTE,
-        'limit': 288,  # 3d * 96 = 288 candles
+        'limit': 1000,  # ~10 days of data
         'ema_type': 'short',
-        'interval_key': '15m'
     },
-    '30m_7d': {
-        'name': '30m (Last 7 days)',
+    '30m': {
+        'name': '30 Minutes',
         'interval': Client.KLINE_INTERVAL_30MINUTE,
-        'limit': 336,  # 7d * 48 = 336 candles
+        'limit': 1000,  # ~20 days of data
         'ema_type': 'short',
-        'interval_key': '30m'
     },
-    '1h_14d': {
-        'name': '1h (Last 14 days)',
+    '1h': {
+        'name': '1 Hour',
         'interval': Client.KLINE_INTERVAL_1HOUR,
-        'limit': 336,  # 14d * 24 = 336 candles
+        'limit': 1000,  # ~41 days of data
         'ema_type': 'mid',
-        'interval_key': '1h'
     },
-    '4h_30d': {
-        'name': '4h (Last 30 days)',
+    '2h': {
+        'name': '2 Hours',
+        'interval': Client.KLINE_INTERVAL_2HOUR,
+        'limit': 1000,  # ~83 days of data
+        'ema_type': 'mid',
+    },
+    '4h': {
+        'name': '4 Hours',
         'interval': Client.KLINE_INTERVAL_4HOUR,
-        'limit': 180,  # 30d * 6 = 180 candles
+        'limit': 1000,  # ~166 days of data
         'ema_type': 'mid',
-        'interval_key': '4h'
     },
-    '1d_90d': {
-        'name': '1d (Last 3 months)',
-        'interval': Client.KLINE_INTERVAL_1DAY,
-        'limit': 90,  # 90 daily candles
+    '6h': {
+        'name': '6 Hours',
+        'interval': Client.KLINE_INTERVAL_6HOUR,
+        'limit': 1000,  # ~250 days of data
         'ema_type': 'mid',
-        'interval_key': '1d'
     },
-    '1d_1y': {
-        'name': '1d (Last year)',
-        'interval': Client.KLINE_INTERVAL_1DAY,
-        'limit': 365,  # 365 daily candles
+    '12h': {
+        'name': '12 Hours',
+        'interval': Client.KLINE_INTERVAL_12HOUR,
+        'limit': 1000,  # ~500 days of data
         'ema_type': 'long',
-        'interval_key': '1d'
     },
-    '1d_3y': {
-        'name': '1d (Last 3 years)',
+    '1d': {
+        'name': '1 Day',
         'interval': Client.KLINE_INTERVAL_1DAY,
-        'limit': 1095,  # 3 years daily (uses chunking)
+        'limit': 1000,  # ~2.7 years of data
         'ema_type': 'long',
-        'interval_key': '1d'
     },
-    '1w_5y': {
-        'name': '1w (Last 5 years)',
+    '1w': {
+        'name': '1 Week',
         'interval': Client.KLINE_INTERVAL_1WEEK,
-        'limit': 260,  # 5 years weekly
+        'limit': 1000,  # ~19 years of data
         'ema_type': 'long',
-        'interval_key': '1w'
     },
 }
 
@@ -1384,10 +1404,11 @@ def calculate_indicators(df, ema_type, timeframe=None):
 
 
 def create_chart(df, symbol, ema1, ema2, show_ema=False, show_bb=False, show_rsi=False, show_volume=False,
-                 show_macd=False, show_stoch=False, show_atr=False):
+                 show_macd=False, show_stoch=False, show_atr=False, chart_type='Line'):
     """
     Create interactive chart with toggleable indicators and candlesticks.
     Clean chart with price and indicators only.
+    chart_type: 'Line' or 'Candlestick'
     """
     # Determine number of rows based on what's enabled
     rows_needed = 1  # Always have price chart
@@ -1455,14 +1476,30 @@ def create_chart(df, symbol, ema1, ema2, show_ema=False, show_bb=False, show_rsi
         specs=specs
     )
 
-    # Price line chart (cleaner than candlesticks)
-    fig.add_trace(go.Scatter(
-        x=df['timestamp'],
-        y=df['Close'],
-        name='Price',
-        line=dict(color='#42A5F5', width=2),
-        hovertemplate='<b>Price:</b> $%{y:,.2f}<br><b>Date:</b> %{x}<extra></extra>'
-    ), row=1, col=1)
+    # Price chart - Line or Candlestick based on user selection
+    if chart_type == 'Candlestick':
+        # Candlestick chart (classic OHLC)
+        fig.add_trace(go.Candlestick(
+            x=df['timestamp'],
+            open=df['Open'],
+            high=df['High'],
+            low=df['Low'],
+            close=df['Close'],
+            name='Price',
+            increasing_line_color='#00C853',  # Green for up candles
+            decreasing_line_color='#FF1744',  # Red for down candles
+            increasing_fillcolor='#00C853',
+            decreasing_fillcolor='#FF1744'
+        ), row=1, col=1)
+    else:
+        # Line chart (cleaner, default)
+        fig.add_trace(go.Scatter(
+            x=df['timestamp'],
+            y=df['Close'],
+            name='Price',
+            line=dict(color='#42A5F5', width=2),
+            hovertemplate='<b>Price:</b> $%{y:,.2f}<br><b>Date:</b> %{x}<extra></extra>'
+        ), row=1, col=1)
 
     # EMAs (toggleable)
     if show_ema:
@@ -2277,15 +2314,6 @@ with col_theme:
         st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
         st.rerun()
 
-# Show info banner about data source
-if client is None:
-    if COINGECKO_API_KEY:
-        st.success("✅ **Data Source**: Using CoinGecko API with Demo API Key (10,000 calls/month, 30 calls/min)", icon="✅")
-    else:
-        st.info("📊 **Data Source**: Using CoinGecko API for market data. Some real-time features may have limited functionality. For full features, ensure Binance API is accessible in your region.", icon="ℹ️")
-else:
-    st.success("✅ **Connected**: Real-time data from Binance API", icon="✅")
-
 # Horizontal Navigation Menu - Modern Style
 st.markdown("<div style='margin: 20px 0;'></div>", unsafe_allow_html=True)
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -2341,22 +2369,29 @@ default_index = crypto_list.index(st.session_state['selected_crypto']) if st.ses
 crypto_name = st.session_state['selected_crypto']
 symbol = SYMBOLS[crypto_name]
 
-# Set default unified timeframe if not in session state (for Chart Analysis)
-if 'unified_timeframe' not in st.session_state:
-    st.session_state['unified_timeframe'] = '4h_30d'  # Default: 4h candles, last 30 days
-unified_timeframe = st.session_state.get('unified_timeframe', '4h_30d')
+# Set default chart interval if not in session state (for Chart Analysis)
+if 'chart_interval' not in st.session_state:
+    st.session_state['chart_interval'] = '4h'  # Default: 4h candles
+chart_interval = st.session_state.get('chart_interval', '4h')
 
 # Get data (only for Chart Analysis mode - other modes don't need it)
 if mode == "📈 Chart Analysis":
-    # Get timeframe configuration
-    tf_config = UNIFIED_TIMEFRAMES[unified_timeframe]
-    interval = tf_config['interval']
-    limit = tf_config['limit']
-    ema_type = tf_config['ema_type']
-    interval_key = tf_config['interval_key']
+    # Get interval configuration
+    interval_config = CHART_INTERVALS[chart_interval]
+    interval = interval_config['interval']
+    limit = interval_config['limit']
+    ema_type = interval_config['ema_type']
+    interval_key = chart_interval  # Use the key directly (e.g., '4h', '1d')
 
     with st.spinner('Loading data...'):
         df = fetch_data(symbol, interval, limit=limit)
+
+        # Debug: Show what we actually loaded
+        if not df.empty:
+            first_date = df['timestamp'].iloc[0]
+            last_date = df['timestamp'].iloc[-1]
+            num_candles = len(df)
+            st.info(f"🔍 Debug: Loaded {num_candles} candles | From: {first_date} | To: {last_date} | Interval: {interval_key}")
 
     if df.empty:
         st.error("⚠️ Failed to fetch data. Please try again.")
@@ -2564,32 +2599,32 @@ if mode == "📈 Chart Analysis":
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Initialize unified_timeframe in session state if not exists
-                    if 'unified_timeframe' not in st.session_state:
-                        st.session_state['unified_timeframe'] = '4h_30d'
+                    # Initialize chart_interval in session state if not exists
+                    if 'chart_interval' not in st.session_state:
+                        st.session_state['chart_interval'] = '4h'
 
-                    # Get list of timeframe keys and names
-                    timeframe_keys = list(UNIFIED_TIMEFRAMES.keys())
-                    timeframe_names = [UNIFIED_TIMEFRAMES[k]['name'] for k in timeframe_keys]
+                    # Get list of interval keys and names
+                    interval_keys = list(CHART_INTERVALS.keys())
+                    interval_names = [CHART_INTERVALS[k]['name'] for k in interval_keys]
 
                     # Find current index
-                    current_tf = st.session_state['unified_timeframe']
-                    current_index = timeframe_keys.index(current_tf) if current_tf in timeframe_keys else 5  # Default to 4h_30d
+                    current_interval = st.session_state['chart_interval']
+                    current_index = interval_keys.index(current_interval) if current_interval in interval_keys else 7  # Default to 4h
 
-                    selected_tf_name = st.selectbox(
-                        "Choose timeframe:",
-                        timeframe_names,
+                    selected_interval_name = st.selectbox(
+                        "Choose interval:",
+                        interval_names,
                         index=current_index,
-                        key="unified_tf_selector",
+                        key="chart_interval_selector",
                         label_visibility="collapsed"
                     )
 
                     # Get the key from the selected name
-                    selected_tf_key = timeframe_keys[timeframe_names.index(selected_tf_name)]
+                    selected_interval_key = interval_keys[interval_names.index(selected_interval_name)]
 
                     # Update session state if changed
-                    if selected_tf_key != st.session_state['unified_timeframe']:
-                        st.session_state['unified_timeframe'] = selected_tf_key
+                    if selected_interval_key != st.session_state['chart_interval']:
+                        st.session_state['chart_interval'] = selected_interval_key
                         st.rerun()
 
                 # 3. INDICATORS MULTISELECT (Light Green)
@@ -2629,6 +2664,20 @@ if mode == "📈 Chart Analysis":
                     show_stoch = False
                     show_atr = False
 
+                    # Chart Type Selector (Line vs Candlestick)
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if 'chart_type' not in st.session_state:
+                        st.session_state.chart_type = 'Line'
+
+                    chart_type = st.radio(
+                        "Chart Type:",
+                        options=['Line', 'Candlestick'],
+                        index=0 if st.session_state.chart_type == 'Line' else 1,
+                        key="chart_type_selector",
+                        horizontal=True
+                    )
+                    st.session_state.chart_type = chart_type
+
                 # 4. SOON BUTTON (Light Purple - Disabled)
                 with col_soon:
                     st.markdown("""
@@ -2654,107 +2703,9 @@ if mode == "📈 Chart Analysis":
                 ema1_chart = ema1
                 ema2_chart = ema2
 
-                # Advanced Configuration Panel (only show if EMA is enabled)
-                if show_ema:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    with st.expander("⚙️ ADVANCED EMA SETTINGS", expanded=False):
-                        st.markdown("""
-                        <div style='background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(139, 195, 74, 0.05) 100%);
-                                    padding: 15px; border-radius: 10px; border: 1px solid rgba(76, 175, 80, 0.3);
-                                    margin-bottom: 15px;'>
-                            <p style='color: #4CAF50; font-size: 14px; font-weight: 600; margin: 0;'>
-                                🎯 Customize EMA periods for advanced analysis
-                            </p>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    # Stochastic Configuration
-                    if show_stoch:
-                        st.markdown("**📈 Stochastic Settings**")
-                        col_stoch1, col_stoch2, col_stoch3, col_stoch4 = st.columns(4)
-                        with col_stoch1:
-                            stoch_k = st.number_input("K Period", min_value=5, max_value=30, value=14, key="stoch_k")
-                        with col_stoch2:
-                            stoch_d = st.number_input("D Period", min_value=1, max_value=10, value=3, key="stoch_d")
-                        with col_stoch3:
-                            stoch_ob = st.number_input("Overbought", min_value=70, max_value=90, value=80, key="stoch_ob")
-                        with col_stoch4:
-                            stoch_os = st.number_input("Oversold", min_value=10, max_value=30, value=20, key="stoch_os")
-                        st.markdown("---")
-
-                    # ATR Configuration
-                    if show_atr:
-                        st.markdown("**📉 ATR Settings**")
-                        atr_period = st.number_input("Period", min_value=5, max_value=30, value=14, key="atr_period")
-
-                # EMA Selection (only show if EMAs are enabled)
-                if show_ema:
-                    st.markdown("""
-                    <div style='background: linear-gradient(135deg, rgba(255, 109, 0, 0.2) 0%, rgba(0, 200, 83, 0.2) 100%);
-                                padding: 20px; border-radius: 15px; border: 2px solid rgba(255, 109, 0, 0.5);
-                                margin: 20px 0; box-shadow: 0 4px 15px rgba(255, 109, 0, 0.2);'>
-                        <p style='color: #ffffff; font-size: 16px; font-weight: 700; letter-spacing: 1px;
-                                   margin: 0 0 15px 0; text-transform: uppercase; text-align: center;'>
-                            📈 EMA CONFIGURATION
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    col_ema1, col_ema2 = st.columns(2)
-
-                    ema_options = [20, 50, 100, 200, 350]
-
-                    with col_ema1:
-                        st.markdown("""
-                        <p style='color: #FF6D00; font-size: 13px; font-weight: 700; margin-bottom: 10px;
-                                   text-align: center; background: rgba(255, 109, 0, 0.15);
-                                   padding: 8px; border-radius: 8px;'>
-                            🔸 FAST EMA
-                        </p>
-                        """, unsafe_allow_html=True)
-                        ema1_selected = st.selectbox(
-                            "Select Fast EMA:",
-                            ema_options,
-                            index=1,  # Default to 50
-                            key="ema1_select",
-                            label_visibility="collapsed"
-                        )
-
-                    with col_ema2:
-                        st.markdown("""
-                        <p style='color: #00C853; font-size: 13px; font-weight: 700; margin-bottom: 10px;
-                                   text-align: center; background: rgba(0, 200, 83, 0.15);
-                                   padding: 8px; border-radius: 8px;'>
-                            🔹 SLOW EMA
-                        </p>
-                        """, unsafe_allow_html=True)
-                        ema2_selected = st.selectbox(
-                            "Select Slow EMA:",
-                            ema_options,
-                            index=3,  # Default to 200
-                            key="ema2_select",
-                            label_visibility="collapsed"
-                        )
-
-                    # Recalculate EMAs with selected values
-                    if ema1_selected and ema2_selected:
-                        df_chart[f'EMA{ema1_selected}'] = EMAIndicator(df_chart['Close'], window=ema1_selected).ema_indicator()
-                        df_chart[f'EMA{ema2_selected}'] = EMAIndicator(df_chart['Close'], window=ema2_selected).ema_indicator()
-                        ema1_chart = ema1_selected
-                        ema2_chart = ema2_selected
-
-                        # Show selected EMAs with modern design
-                        st.markdown(f"""
-                        <div style='text-align: center; padding: 15px;
-                                    background: linear-gradient(135deg, rgba(255, 109, 0, 0.2) 0%, rgba(0, 200, 83, 0.2) 100%);
-                                    border-radius: 12px; margin-top: 15px;
-                                    border: 2px solid rgba(255, 215, 0, 0.4);
-                                    box-shadow: 0 3px 10px rgba(255, 215, 0, 0.2);'>
-                            <span style='color: #FF6D00; font-size: 16px; font-weight: 700;'>EMA {ema1_selected}</span>
-                            <span style='color: #FFD700; margin: 0 12px; font-size: 18px;'>×</span>
-                            <span style='color: #00C853; font-size: 16px; font-weight: 700;'>EMA {ema2_selected}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
+                # Keep default EMA values from calculate_indicators
+                ema1_chart = ema1
+                ema2_chart = ema2
 
                 st.markdown("---")
 
@@ -2809,7 +2760,8 @@ if mode == "📈 Chart Analysis":
                                         show_volume=show_volume,
                                         show_macd=False,
                                         show_stoch=False,
-                                        show_atr=False
+                                        show_atr=False,
+                                        chart_type=chart_type
                                     )
 
                                     # Update layout for smaller charts
@@ -2831,7 +2783,8 @@ if mode == "📈 Chart Analysis":
                             show_volume=show_volume,
                             show_macd=show_macd,
                             show_stoch=show_stoch,
-                            show_atr=show_atr
+                            show_atr=show_atr,
+                            chart_type=chart_type
                         )
                         st.plotly_chart(fig, use_container_width=True)
                 else:
